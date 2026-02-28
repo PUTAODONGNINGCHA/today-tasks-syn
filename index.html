@@ -851,9 +851,10 @@
 
   <script>
     // ===========================
-    // 关键修复（云同步）
-    // ✅ 改用 rev（递增版本号）判新旧，避免设备时间不一致导致“单向同步”
-    // ✅ pull 后 normalizeTasks，避免空白/字段异常
+    // 云同步修复版：
+    // ✅ 删除 suppressNextPush（避免“第一次修改不推送”）
+    // ✅ push 前先读远端 rev：远端更大则先 pull，避免覆盖
+    // ✅ pull 后 normalizeTasks
     // ===========================
 
     // ===== Utils
@@ -916,16 +917,15 @@
     let localUpdatedAt = 0;
     let lastRemoteUpdatedAt = 0;
 
-    // ✅ 用版本号做同步判断（关键修复）
+    // ✅ 用版本号做同步判断
     let localRev = 0;
     let lastRemoteRev = 0;
 
     let cloudPushTimer = null;
     let cloudPollTimer = null;
-    let suppressNextPush = false;
 
     function markStateChanged(){
-      // ✅ 不用时间戳判新旧，改用 rev 递增
+      // ✅ 用 rev 递增（不依赖设备时间）
       localRev = (Number(localRev) || 0) + 1;
       try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
 
@@ -1856,9 +1856,9 @@
     // =====================
     // Public Cloud Sync (No Login) - Supabase 公共同步
     // =====================
-    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co"; // TODO: 换成你的
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8";                       // TODO: 换成你的
-    const PUBLIC_ROOM_ID = "global";                                 // 建议换成只有你知道的房间码
+    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8";
+    const PUBLIC_ROOM_ID = "global";
 
     const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -1870,16 +1870,34 @@
       };
     }
 
+    // ✅ 修复：push 前先读远端 rev，避免低 rev 覆盖高 rev
     async function cloudPushNow(){
-      if(suppressNextPush){
-        suppressNextPush = false;
-        return;
-      }
       const payload = buildLocalState();
       try{
+        // 先读远端
+        const { data: rdata, error: rerr } = await supa
+          .from("public_state")
+          .select("state")
+          .eq("id", PUBLIC_ROOM_ID)
+          .single();
+
+        if(rerr && rerr.code !== "PGRST116"){ // PGRST116: no rows (可能不存在)
+          // 其它错误才抛
+          throw rerr;
+        }
+
+        const remoteRev = Number(rdata?.state?.rev || 0);
+
+        // 远端更大 => 先 pull（避免覆盖）
+        if(remoteRev > (payload.rev || 0)){
+          await cloudPullOnce();
+          return;
+        }
+
         const { error } = await supa
           .from("public_state")
           .upsert({ id: PUBLIC_ROOM_ID, state: payload, updated_at: new Date().toISOString() });
+
         if(error) throw error;
 
         lastRemoteRev = Math.max(lastRemoteRev, payload.rev || 0);
@@ -1909,10 +1927,8 @@
         const remoteRev = Number(remote.rev || 0);
         if(!remoteRev) return;
 
-        // ✅ 用 rev 判断新旧（关键修复）
+        // ✅ 用 rev 判断新旧
         if(remoteRev <= Math.max(lastRemoteRev, localRev)) return;
-
-        suppressNextPush = true;
 
         lastRemoteRev = remoteRev;
         localRev = remoteRev;
@@ -1972,11 +1988,9 @@
         localRev = 1;
         try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
         scheduleCloudPush();
-      }else{
-        // 没数据也没关系，拉取为主
       }
     }else{
-      // 正常情况：也推一把（不会覆盖更高 rev 的远端）
+      // 正常情况：也推一把（cloudPushNow 内部会先对比远端 rev，不会覆盖更高 rev）
       scheduleCloudPush();
     }
 
