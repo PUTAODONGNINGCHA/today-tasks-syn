@@ -854,7 +854,7 @@
     // 性能优化点（核心）
     // 1) tick 每秒只更新倒计时文本，不重绘整列
     // 2) localStorage 写入 debounce
-    // 3) 云同步：本地变更防抖上传 + 定时拉取
+    // 3) 云同步：首次先拉后推 + 本地变更防抖上传 + 定时拉取
     // ===========================
 
     // ===== Utils
@@ -901,6 +901,9 @@
     const LS_WMODE="weatherMode";
     const LS_WCOORD="lastCoords";
 
+    // ✅ 新增：用于避免刷新导致 updatedAt 乱覆盖
+    const LS_UPDATED_AT="todo_cloud_updated_at_v1";
+
     // ===== State
     let tasksByOwner = { sean: [], nico: [] };
     let edit = { owner: null, id: null };
@@ -916,8 +919,13 @@
     let cloudPollTimer = null;
     let suppressNextPush = false;
 
+    // ✅ 新增：首次先拉后推，防止手机空数据覆盖云端
+    let hasInitialPull = false;
+    let pendingPushAfterPull = false;
+
     function markStateChanged(){
       localUpdatedAt = Date.now();
+      try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
       scheduleCloudPush();
     }
 
@@ -1841,11 +1849,11 @@
     // =====================
     // Public Cloud Sync (No Login) - Supabase 公共同步
     // =====================
-    // 1) 填入你的 Supabase 项目地址 & Publishable key
-    // 2) PUBLIC_ROOM_ID 建议改成“只有你知道的房间码”，避免被别人覆盖
-    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co";    // TODO: 替换
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8";    // TODO: 替换
-    const PUBLIC_ROOM_ID = "global";                                // 可改成私密房间码，例如 "putao-2026-sean-nico"
+    // 1) 填入你的 Supabase 项目地址 & anon key
+    // 2) PUBLIC_ROOM_ID 必须改成只有你知道的随机码（别用 global）
+    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co"; // TODO: 确认你的项目
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8"; // TODO: anon key
+    const PUBLIC_ROOM_ID = "global"; // ✅ 换成你自己的随机码
 
     const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -1857,17 +1865,23 @@
     }
 
     async function cloudPushNow(){
+      // ✅ 关键：首次 pull 完成前禁止 push（避免手机空数据覆盖云端）
+      if(!hasInitialPull){
+        pendingPushAfterPull = true;
+        return;
+      }
+
       if(suppressNextPush){
         suppressNextPush = false;
         return;
       }
+
       const payload = buildLocalState();
       try{
         const { error } = await supa
           .from("public_state")
-          .upsert({ id: PUBLIC_ROOM_ID, state: payload, updated_at: new Date().toISOString() });
+          .upsert({ id: PUBLIC_ROOM_ID, state: payload }); // 让 DB 自己更新时间也可以
         if(error) throw error;
-        // 以本地为准，更新“远端已同步时间”
         lastRemoteUpdatedAt = Math.max(lastRemoteUpdatedAt, payload.updatedAt);
       }catch(e){
         console.warn("cloud push failed", e);
@@ -1875,7 +1889,6 @@
     }
 
     function scheduleCloudPush(){
-      // 本地变化防抖上传，避免频繁写库
       if(cloudPushTimer) clearTimeout(cloudPushTimer);
       cloudPushTimer = setTimeout(cloudPushNow, 700);
     }
@@ -1886,8 +1899,18 @@
           .from("public_state")
           .select("state")
           .eq("id", PUBLIC_ROOM_ID)
-          .single();
+          .maybeSingle(); // ✅ 没有行时不报错
+
         if(error) throw error;
+
+        // ✅ 到这里说明“首次 pull 已完成”（无论云端有没有数据）
+        if(!hasInitialPull){
+          hasInitialPull = true;
+          if(pendingPushAfterPull){
+            pendingPushAfterPull = false;
+            scheduleCloudPush();
+          }
+        }
 
         const remote = data?.state;
         if(!remote || !remote.tasksByOwner) return;
@@ -1895,24 +1918,23 @@
         const remoteAt = Number(remote.updatedAt || 0);
         if(!remoteAt) return;
 
-        // 远端不比本地新：忽略
         if(remoteAt <= Math.max(lastRemoteUpdatedAt, localUpdatedAt)) return;
 
-        // 应用远端
-        suppressNextPush = true; // 防止“刚拉下来又立刻 push 回去”
+        suppressNextPush = true;
         lastRemoteUpdatedAt = remoteAt;
         localUpdatedAt = remoteAt;
+        try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
 
-        // 覆盖内存态
-        tasksByOwner = remote.tasksByOwner;
+        // ✅ pull 后 normalize，避免字段缺失导致“空白任务”
+        tasksByOwner = {
+          sean: normalizeTasks(remote.tasksByOwner?.sean || []),
+          nico: normalizeTasks(remote.tasksByOwner?.nico || [])
+        };
 
-        // 同步到 localStorage（保证刷新也一致）
         try{ localStorage.setItem(LS_SEAN, JSON.stringify(tasksByOwner.sean || [])); }catch{}
         try{ localStorage.setItem(LS_NICO, JSON.stringify(tasksByOwner.nico || [])); }catch{}
 
         renderAll();
-
-        // 如果有倒计时任务，继续 tick
         if(hasAnyRunningTimer()) ensureGlobalTick();
       }catch(e){
         console.warn("cloud pull failed", e);
@@ -1922,7 +1944,7 @@
     function startCloudSync(){
       if(cloudPollTimer) return;
       cloudPullOnce(); // 打开先拉一次
-      cloudPollTimer = setInterval(cloudPullOnce, 3000); // 每 3 秒拉取
+      cloudPollTimer = setInterval(cloudPullOnce, 3000);
     }
 
     // ===== Init
@@ -1935,12 +1957,22 @@
     initWeather();
     loadActs();
 
-    // 初始化 localUpdatedAt（避免 0）
-    localUpdatedAt = Date.now();
-    // 启动同步（会先 pull 一次）
+    // ✅ 从 localStorage 恢复 localUpdatedAt，避免刷新乱覆盖
+    localUpdatedAt = Number(localStorage.getItem(LS_UPDATED_AT) || 0) || Date.now();
+
+    // 启动同步（先 pull）
     startCloudSync();
-    // 若本地已经有数据，也可以推一把（防止云端为空时覆盖）
-    scheduleCloudPush();
+
+    // ✅ 不再无条件 scheduleCloudPush()
+    // 只有用户改动 markStateChanged() 才会 push
+    // （如果你希望“本地有数据、云端为空时自动建一份”，可以在首次 pull 完成后手动推一次）
+    // 这里加一个温和策略：首次 pull 后 1 秒，如果云端空且本地有任务，则推一次
+    setTimeout(()=>{
+      if(hasInitialPull){
+        const hasLocal = (tasksByOwner.sean?.length || 0) + (tasksByOwner.nico?.length || 0) > 0;
+        if(hasLocal) scheduleCloudPush();
+      }
+    }, 1200);
 
     if(hasAnyRunningTimer()) ensureGlobalTick();
   </script>
