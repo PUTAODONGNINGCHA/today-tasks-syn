@@ -851,10 +851,9 @@
 
   <script>
     // ===========================
-    // 性能优化点（核心）
-    // 1) tick 每秒只更新倒计时文本，不重绘整列
-    // 2) localStorage 写入 debounce
-    // 3) 云同步：首次先拉后推 + 本地变更防抖上传 + 定时拉取
+    // 关键修复（云同步）
+    // ✅ 改用 rev（递增版本号）判新旧，避免设备时间不一致导致“单向同步”
+    // ✅ pull 后 normalizeTasks，避免空白/字段异常
     // ===========================
 
     // ===== Utils
@@ -901,8 +900,9 @@
     const LS_WMODE="weatherMode";
     const LS_WCOORD="lastCoords";
 
-    // ✅ 新增：用于避免刷新导致 updatedAt 乱覆盖
+    // ✅ 云同步本地元信息
     const LS_UPDATED_AT="todo_cloud_updated_at_v1";
+    const LS_REV="todo_cloud_rev_v1";
 
     // ===== State
     let tasksByOwner = { sean: [], nico: [] };
@@ -915,17 +915,24 @@
     // ===== Cloud sync state
     let localUpdatedAt = 0;
     let lastRemoteUpdatedAt = 0;
+
+    // ✅ 用版本号做同步判断（关键修复）
+    let localRev = 0;
+    let lastRemoteRev = 0;
+
     let cloudPushTimer = null;
     let cloudPollTimer = null;
     let suppressNextPush = false;
 
-    // ✅ 新增：首次先拉后推，防止手机空数据覆盖云端
-    let hasInitialPull = false;
-    let pendingPushAfterPull = false;
-
     function markStateChanged(){
+      // ✅ 不用时间戳判新旧，改用 rev 递增
+      localRev = (Number(localRev) || 0) + 1;
+      try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
+
+      // updatedAt 仅用于展示/日志
       localUpdatedAt = Date.now();
       try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
+
       scheduleCloudPush();
     }
 
@@ -1849,40 +1856,34 @@
     // =====================
     // Public Cloud Sync (No Login) - Supabase 公共同步
     // =====================
-    // 1) 填入你的 Supabase 项目地址 & anon key
-    // 2) PUBLIC_ROOM_ID 必须改成只有你知道的随机码（别用 global）
-    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co"; // TODO: 确认你的项目
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8"; // TODO: anon key
-    const PUBLIC_ROOM_ID = "global"; // ✅ 换成你自己的随机码
+    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co"; // TODO: 换成你的
+    const SUPABASE_KEY = "YOUR_ANON_KEY_HERE";                       // TODO: 换成你的
+    const PUBLIC_ROOM_ID = "global";                                 // 建议换成只有你知道的房间码
 
     const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     function buildLocalState(){
       return {
         tasksByOwner,
-        updatedAt: localUpdatedAt || Date.now()
+        updatedAt: localUpdatedAt || Date.now(),
+        rev: localRev || 0
       };
     }
 
     async function cloudPushNow(){
-      // ✅ 关键：首次 pull 完成前禁止 push（避免手机空数据覆盖云端）
-      if(!hasInitialPull){
-        pendingPushAfterPull = true;
-        return;
-      }
-
       if(suppressNextPush){
         suppressNextPush = false;
         return;
       }
-
       const payload = buildLocalState();
       try{
         const { error } = await supa
           .from("public_state")
-          .upsert({ id: PUBLIC_ROOM_ID, state: payload }); // 让 DB 自己更新时间也可以
+          .upsert({ id: PUBLIC_ROOM_ID, state: payload, updated_at: new Date().toISOString() });
         if(error) throw error;
-        lastRemoteUpdatedAt = Math.max(lastRemoteUpdatedAt, payload.updatedAt);
+
+        lastRemoteRev = Math.max(lastRemoteRev, payload.rev || 0);
+        lastRemoteUpdatedAt = Math.max(lastRemoteUpdatedAt, payload.updatedAt || 0);
       }catch(e){
         console.warn("cloud push failed", e);
       }
@@ -1899,33 +1900,33 @@
           .from("public_state")
           .select("state")
           .eq("id", PUBLIC_ROOM_ID)
-          .maybeSingle(); // ✅ 没有行时不报错
-
+          .single();
         if(error) throw error;
-
-        // ✅ 到这里说明“首次 pull 已完成”（无论云端有没有数据）
-        if(!hasInitialPull){
-          hasInitialPull = true;
-          if(pendingPushAfterPull){
-            pendingPushAfterPull = false;
-            scheduleCloudPush();
-          }
-        }
 
         const remote = data?.state;
         if(!remote || !remote.tasksByOwner) return;
 
-        const remoteAt = Number(remote.updatedAt || 0);
-        if(!remoteAt) return;
+        const remoteRev = Number(remote.rev || 0);
+        if(!remoteRev) return;
 
-        if(remoteAt <= Math.max(lastRemoteUpdatedAt, localUpdatedAt)) return;
+        // ✅ 用 rev 判断新旧（关键修复）
+        if(remoteRev <= Math.max(lastRemoteRev, localRev)) return;
 
         suppressNextPush = true;
-        lastRemoteUpdatedAt = remoteAt;
-        localUpdatedAt = remoteAt;
-        try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
 
-        // ✅ pull 后 normalize，避免字段缺失导致“空白任务”
+        lastRemoteRev = remoteRev;
+        localRev = remoteRev;
+        try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
+
+        // updatedAt 只做显示/日志
+        const remoteAt = Number(remote.updatedAt || 0);
+        if(remoteAt){
+          lastRemoteUpdatedAt = remoteAt;
+          localUpdatedAt = remoteAt;
+          try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
+        }
+
+        // ✅ pull 后 normalize，避免空白/字段异常
         tasksByOwner = {
           sean: normalizeTasks(remote.tasksByOwner?.sean || []),
           nico: normalizeTasks(remote.tasksByOwner?.nico || [])
@@ -1943,7 +1944,7 @@
 
     function startCloudSync(){
       if(cloudPollTimer) return;
-      cloudPullOnce(); // 打开先拉一次
+      cloudPullOnce();
       cloudPollTimer = setInterval(cloudPullOnce, 3000);
     }
 
@@ -1957,22 +1958,27 @@
     initWeather();
     loadActs();
 
-    // ✅ 从 localStorage 恢复 localUpdatedAt，避免刷新乱覆盖
+    // ✅ 初始化同步元信息（重要）
     localUpdatedAt = Number(localStorage.getItem(LS_UPDATED_AT) || 0) || Date.now();
+    localRev = Number(localStorage.getItem(LS_REV) || 0) || 0;
 
-    // 启动同步（先 pull）
+    // 启动同步（会先 pull 一次）
     startCloudSync();
 
-    // ✅ 不再无条件 scheduleCloudPush()
-    // 只有用户改动 markStateChanged() 才会 push
-    // （如果你希望“本地有数据、云端为空时自动建一份”，可以在首次 pull 完成后手动推一次）
-    // 这里加一个温和策略：首次 pull 后 1 秒，如果云端空且本地有任务，则推一次
-    setTimeout(()=>{
-      if(hasInitialPull){
-        const hasLocal = (tasksByOwner.sean?.length || 0) + (tasksByOwner.nico?.length || 0) > 0;
-        if(hasLocal) scheduleCloudPush();
+    // 首次打开：如果本地有任务且 rev=0，就把 rev 置 1 并 push 一次，避免被空云端覆盖
+    if(localRev === 0){
+      const hasLocalData = (tasksByOwner.sean?.length || 0) + (tasksByOwner.nico?.length || 0) > 0;
+      if(hasLocalData){
+        localRev = 1;
+        try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
+        scheduleCloudPush();
+      }else{
+        // 没数据也没关系，拉取为主
       }
-    }, 1200);
+    }else{
+      // 正常情况：也推一把（不会覆盖更高 rev 的远端）
+      scheduleCloudPush();
+    }
 
     if(hasAnyRunningTimer()) ensureGlobalTick();
   </script>
