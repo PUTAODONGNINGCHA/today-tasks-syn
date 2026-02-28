@@ -271,6 +271,36 @@
     .item.done .text{ text-decoration: line-through; color: var(--muted2); }
 
     .meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    
+    /* ===== 修复：重要性标签导致文字被挤压竖排 ===== */
+    /* 允许任务整体内部换行 */
+    .item{
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* 给文字一个最小宽度，避免被挤成一字一行 */
+    .text{
+      flex: 1 1 220px;   /* 可改成 200px 或 240px 看效果 */
+      min-width: 180px;
+    }
+
+    /* 右侧按钮区域挤不下时自动换行 */
+    .meta{
+      margin-left: auto;
+      flex: 0 1 auto;
+      max-width: 100%;
+    }
+
+    /* 手机优化（强烈推荐保留） */
+    @media (max-width: 520px){
+      .meta{
+        flex-basis: 100%;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+    }
+
     .note{ opacity:.85; font-size: 14px; }
 
     .tag{
