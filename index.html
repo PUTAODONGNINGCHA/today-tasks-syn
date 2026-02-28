@@ -417,6 +417,22 @@
     }
     .card .body{ padding: 14px; }
 
+
+    /* 角部圆形样式 */
+    .card, .weatherHero {
+        border-radius: 20px; /* 设置圆角大小 */
+        background: #f6f7fb; /* 统一背景颜色 */
+    }
+
+    /* 如果要单独修改卡片上某一部分 */
+    .card .head {
+        border-radius: 20px 20px 0 0; /* 仅上边角圆角 */
+    }
+
+    .weatherHero .head {
+        border-radius: 20px 20px 0 0;
+    }
+
     .weatherHero{
       background:
         radial-gradient(900px 360px at 10% 0%, rgba(79,70,229,.14), transparent 55%),
