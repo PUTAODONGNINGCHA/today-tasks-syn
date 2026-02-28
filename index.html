@@ -969,6 +969,7 @@
 
     let cloudPushTimer = null;
     let cloudPollTimer = null;
+    let isConfirming = false; // ✅ 弹窗确认期间，暂停 cloudPull 防止覆盖
 
     function markStateChanged(){
       // ✅ 用 rev 递增（不依赖设备时间）
@@ -2084,6 +2085,7 @@
     }
 
     async function cloudPullOnce(){
+      if(isConfirming) return; // ✅ 防止弹窗处理中被云端覆盖
       try{
         const { data, error } = await supa
           .from("public_state")
@@ -2143,8 +2145,78 @@
     renderAll();
     // ✅ 新增：先补记离开期间结束的计时
     reconcileExpiredTimers();
-    // ✅ 新增：再弹窗询问是否完成（只影响 pendingConfirm 的任务）
-    promptPendingConfirmsOnce();
+
+    async function promptPendingConfirmsOnce(){
+      if(_confirmingQueue) return;
+
+      const queue = [];
+      for(const owner of ["sean","nico"]){
+        for(const t of tasksByOwner[owner]){
+          if(t.pendingConfirm && !t.completed){
+            queue.push({ owner, id: t.id });
+          }
+        }
+      }
+      if(!queue.length) return;
+
+      _confirmingQueue = true;
+      isConfirming = true; // ✅ 暂停 cloudPull
+
+      // 让 UI 先渲染完再弹窗
+      setTimeout(async ()=>{
+        for(const item of queue){
+          const t = getTask(item.owner, item.id);
+          if(!t || !t.pendingConfirm) continue;
+
+          const elapsed = t.pendingConfirm.elapsedSec || 0;
+
+          const ok = confirm(
+            `⏰ 你离开页面期间有一个番茄钟已结束：\n` +
+            `「${t.text}」\n\n` +
+            `本次已自动累计：${fmtSpent(elapsed)}\n` +
+            `累计用时：${fmtSpent(t.spentSec)}\n\n` +
+            `是否已完成该任务？\n\n` +
+            `（取消 = 未完成，但不再提示）`
+          );
+
+          // ✅ ok=true => 完成；ok=false(取消) => 未完成，但这次确认视为已处理
+          t.completed = !!ok;
+
+          if(t.completed){
+            const done = tasksByOwner[item.owner].filter(x=>x.completed && x.id!==t.id);
+            const max = done.length ? Math.max(...done.map(x=>x.order)) : -1;
+            t.order = max + 1;
+          }else{
+            const pending = tasksByOwner[item.owner].filter(x=>!x.completed && x.id!==t.id);
+            const max = pending.length ? Math.max(...pending.map(x=>x.order)) : -1;
+            t.order = max + 1;
+          }
+
+          // ✅ 关键：无论点“好”还是“取消”，都清掉 pendingConfirm（否则会重复弹）
+          t.pendingConfirm = null;
+
+          // 重新整理 order
+          const tasks = tasksByOwner[item.owner];
+          const p = tasks.filter(x=>!x.completed).sort((a,b)=>a.order-b.order);
+          const d = tasks.filter(x=> x.completed).sort((a,b)=>a.order-b.order);
+          p.forEach((x,i)=>x.order=i);
+          d.forEach((x,i)=>x.order=i);
+          tasksByOwner[item.owner] = [...p, ...d];
+
+          // ✅ 关键：立刻落盘 + rev+1 + 立刻 push（避免云端旧状态覆盖回来）
+          saveOwner(item.owner);
+          renderOwner(item.owner);
+
+          markStateChanged();
+          await cloudPushNow(); // ✅ 强制立即推送，不等 debounce
+        }
+
+        isConfirming = false;
+        _confirmingQueue = false;
+      }, 50);
+    }
+
+
     setDateTitle();
     initWeather();
     loadActs();
