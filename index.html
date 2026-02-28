@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今日任务 · 三列版（Sean / Nico / 天气 + 番茄钟）</title>
+  <style>
+    :root{
+      --bg1:#f6f7fb;
+      --bg2:#ffffff;
+
+      --cardSolid: #ffffff;
+
+      --text: #0f172a;
+      --muted: #64748b;
+      --muted2:#94a3b8;
+
+      --border: rgba(15,23,42,.10);
+      --border2: rgba(15,23,42,.14);
+
+      --ring: rgba(99, 102, 241, .25);
+      --primary: #4f46e5;
+      --primary2:#7c3aed;
+
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
+      --shadow2: 0 18px 60px rgba(2,6,23,.12);
+
+      --radius: 14px;
+      --radius2: 20px;
+
+      --red: #ef4444;    --redBg: rgba(239,68,68,.10);   --redBd: rgba(239,68,68,.22);
+      --yellow:#f59e0b;  --yelBg: rgba(245,158,11,.12);  --yelBd: rgba(245,158,11,.25);
+      --green:#22c55e;   --grnBg: rgba(34,197,94,.10);   --grnBd: rgba(34,197,94,.22);
+
+      --indigoBg: rgba(79,70,229,.10);
+      --indigoBd: rgba(79,70,229,.18);
+      --indigoTx: rgba(79,70,229,.92);
+    }
+
+    *{ box-sizing:border-box; margin:0; padding:0 }
+    html, body{ height:100% }
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% 10%, rgba(79,70,229,.10), transparent 60%),
+        radial-gradient(900px 500px at 95% 15%, rgba(124,58,237,.08), transparent 55%),
+        radial-gradient(1000px 650px at 40% 110%, rgba(34,197,94,.07), transparent 55%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+      overflow:auto;
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    /* ===== Layout ===== */
+    .app{
+      height:100vh;
+      width:100%;
+      display:grid;
+      grid-template-columns: 380px 380px 1fr;
+      gap: 18px;
+      padding: 18px;
+      align-items: start;
+    }
+
+    .col{
+      padding:18px;
+      overflow:auto;
+      border-radius: 22px;
+      border: 1px solid rgba(15,23,42,.10);
+      box-shadow: var(--shadow2);
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(10px);
+      scroll-behavior: smooth;
+      min-width: 0;
+    }
+    .taskCol{ background: rgba(255,255,255,.92); }
+    .infoCol{ background: rgba(255,255,255,.72); backdrop-filter: blur(14px); }
+
+    .col::-webkit-scrollbar{ width: 10px; }
+    .col::-webkit-scrollbar-thumb{
+      background: rgba(15,23,42,.12);
+      border-radius: 999px;
+      border: 3px solid rgba(255,255,255,0);
+      background-clip: padding-box;
+    }
+    .col::-webkit-scrollbar-thumb:hover{ background: rgba(15,23,42,.20); }
+
+    /* ===== Brand ===== */
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      padding: 6px 6px 14px;
+    }
+    .logo{
+      width:36px;height:36px;border-radius:14px;
+      background: linear-gradient(135deg, rgba(79,70,229,.95), rgba(124,58,237,.95));
+      box-shadow: 0 12px 30px rgba(79,70,229,.18);
+      display:grid;place-items:center;color:#fff;font-weight:950;
+      letter-spacing:.5px;
+      user-select:none;
+    }
+    .brand h1{ font-size:18px; font-weight:950; line-height:1.1; letter-spacing:.2px; }
+    .brand p{ font-size:12px; color: var(--muted); margin-top:2px; }
+
+    .stack{ display:flex; flex-direction:column; gap:12px; }
+
+    /* ===== Inputs / Buttons ===== */
+    .row{ display:flex; gap:10px; }
+    .input{
+      flex:1;
+      background: var(--cardSolid);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 12px;
+      font-size: 14px;
+      outline:none;
+      transition: border-color .15s, box-shadow .15s;
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+    }
+    .input:focus{
+      border-color: rgba(79,70,229,.35);
+      box-shadow: 0 0 0 4px var(--ring), 0 1px 0 rgba(255,255,255,.95) inset;
+    }
+
+    .btn{
+      border: 1px solid var(--border);
+      background: var(--cardSolid);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 11px 12px;
+      font-weight: 900;
+      cursor:pointer;
+      transition: transform .12s, box-shadow .12s, background .12s, border-color .12s;
+      user-select:none;
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+      white-space:nowrap;
+    }
+    .btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--border2); }
+    .btn:active{ transform: translateY(0px); box-shadow: none; }
+
+    .btn.primary{
+      border-color: rgba(79,70,229,.25);
+      background: linear-gradient(135deg, rgba(79,70,229,.95), rgba(124,58,237,.95));
+      color:#fff;
+      box-shadow: 0 12px 30px rgba(79,70,229,.18);
+    }
+    .btn.primary:hover{ box-shadow: 0 16px 38px rgba(79,70,229,.24); }
+
+    .btn.ghost{
+      background: transparent;
+      border-color: rgba(15,23,42,.08);
+      color: rgba(15,23,42,.78);
+      box-shadow:none;
+    }
+    .btn.ghost:hover{
+      background: rgba(15,23,42,.04);
+      border-color: rgba(15,23,42,.12);
+      transform:none;
+      box-shadow:none;
+    }
+    .btn.icon{
+      padding: 10px 10px;
+      width: 38px; height: 38px;
+      display:grid; place-items:center;
+      font-weight: 950;
+      border-radius: 14px;
+    }
+
+    /* ===== Sections / Lists ===== */
+    .sectionHead{
+      display:flex; align-items:center; gap:10px;
+      padding: 0 2px;
+      margin-top: 6px;
+    }
+    .sectionTitle{
+      display:inline-flex; align-items:baseline; gap:8px;
+      font-size:13px; font-weight: 950;
+      color: rgba(15,23,42,.72);
+      letter-spacing: .2px;
+    }
+    .count{
+      font-size:12px;
+      color: var(--muted2);
+      font-weight: 900;
+    }
+    .spacer{ margin-left:auto; }
+    .mini{
+      border: 1px solid var(--border);
+      background: var(--cardSolid);
+      color: var(--muted);
+      border-radius: 14px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor:pointer;
+      transition: background .12s, border-color .12s, transform .12s;
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+      font-weight: 900;
+    }
+    .mini:hover{ background: rgba(15,23,42,.03); border-color: var(--border2); transform: translateY(-1px); }
+    .mini:active{ transform: translateY(0); }
+
+    ul{ list-style:none; }
+    .empty{
+      border: 1px dashed rgba(15,23,42,.20);
+      color: var(--muted);
+      border-radius: 16px;
+      padding: 12px;
+      font-size: 12px;
+      text-align:center;
+      background: rgba(255,255,255,.70);
+    }
+
+    .item{
+      display:flex; align-items:center; gap:10px;
+      padding: 10px 10px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.88);
+      box-shadow: 0 1px 0 rgba(255,255,255,.92) inset;
+      transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
+      cursor:pointer;
+    }
+    .item + .item{ margin-top: 8px; }
+    .item:hover{
+      transform: translateY(-1px);
+      border-color: var(--border2);
+      box-shadow: var(--shadow);
+      background: rgba(255,255,255,.95);
+    }
+    .item.done{
+      opacity: .82;
+      background: rgba(34,197,94,.08);
+      border-color: rgba(34,197,94,.18);
+      box-shadow: none;
+    }
+
+    .chk{
+      width:22px;height:22px;border-radius: 999px;
+      border: 1.5px solid rgba(79,70,229,.55);
+      display:grid; place-items:center;
+      flex:0 0 22px;
+      background: rgba(79,70,229,.06);
+    }
+    .chk::after{ content:"✓"; font-size:12px; color:#fff; opacity:0; transform: scale(.95); transition:.12s; }
+    .item.done .chk{
+      background: linear-gradient(135deg, rgba(79,70,229,.95), rgba(124,58,237,.95));
+      border-color: rgba(79,70,229,.45);
+      box-shadow: 0 10px 26px rgba(79,70,229,.16);
+    }
+    .item.done .chk::after{ opacity: 1; transform: scale(1); }
+
+    .text{
+      flex:1;
+      font-size: 14px;
+      color: rgba(15,23,42,.92);
+      word-break: break-word;
+    }
+    .item.done .text{ text-decoration: line-through; color: var(--muted2); }
+
+    .meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .note{ opacity:.85; font-size: 14px; }
+
+    .tag{
+      display:inline-flex; align-items:center; gap:8px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 950;
+      border: 1px solid transparent;
+      user-select:none;
+      letter-spacing: .1px;
+      background: rgba(15,23,42,.03);
+      color: rgba(15,23,42,.78);
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px; flex:0 0 10px;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.85) inset;
+    }
+    .tag.red{ background: var(--redBg); border-color: var(--redBd); color: #b91c1c; }
+    .tag.yellow{ background: var(--yelBg); border-color: var(--yelBd); color: #92400e; }
+    .tag.green{ background: var(--grnBg); border-color: var(--grnBd); color: #166534; }
+    .tag.red .dot{ background: var(--red); }
+    .tag.yellow .dot{ background: var(--yellow); }
+    .tag.green .dot{ background: var(--green); }
+
+    .hl-red{ border-color: var(--redBd); background: linear-gradient(0deg, var(--redBg), var(--redBg)), rgba(255,255,255,.92); }
+    .hl-yellow{ border-color: var(--yelBd); background: linear-gradient(0deg, var(--yelBg), var(--yelBg)), rgba(255,255,255,.92); }
+    .hl-green{ border-color: var(--grnBd); background: linear-gradient(0deg, var(--grnBg), var(--grnBg)), rgba(255,255,255,.92); }
+    .item.done.hl-red, .item.done.hl-yellow, .item.done.hl-green{
+      background: rgba(34,197,94,.08);
+      border-color: rgba(34,197,94,.18);
+    }
+
+    .xbtn{
+      width:34px;height:34px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.90);
+      cursor:pointer;
+      display:grid; place-items:center;
+      color: rgba(239,68,68,.95);
+      font-weight: 950;
+      transition: transform .12s, background .12s, border-color .12s;
+    }
+    .item:hover .xbtn{ background: rgba(255,255,255,.98); }
+    .xbtn:hover{ background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.20); transform: translateY(-1px); }
+    .xbtn:active{ transform: translateY(0); }
+
+    /* Drag UI */
+    .drag{
+      width: 26px; height: 26px;
+      border-radius: 12px;
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.88);
+      display:grid; place-items:center;
+      color: rgba(15,23,42,.55);
+      font-weight: 950;
+      cursor: grab;
+      user-select:none;
+    }
+    .item:active .drag{ cursor: grabbing; }
+    .item.dragging{ opacity: .55; transform: scale(.99); }
+    .dropHint{
+      outline: 2px dashed rgba(79,70,229,.30);
+      outline-offset: 4px;
+    }
+
+    /* Timer pills/buttons */
+    .pill2{
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.80);
+      color: rgba(15,23,42,.72);
+      font-size: 12px;
+      font-weight: 950;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill2.indigo{
+      border-color: var(--indigoBd);
+      background: var(--indigoBg);
+      color: var(--indigoTx);
+    }
+
+    /* ===== Right cards ===== */
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .card{
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(15,23,42,.10);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .head{
+      padding: 12px 14px 10px;
+      display:flex; align-items:center; gap:10px;
+      border-bottom: 1px solid rgba(15,23,42,.06);
+      background: rgba(255,255,255,.70);
+      backdrop-filter: blur(10px);
+    }
+    .card .head h2{
+      font-size: 14px;
+      font-weight: 950;
+      color: rgba(15,23,42,.88);
+      letter-spacing: .2px;
+    }
+    .card .body{ padding: 14px; }
+
+    .weatherHero{
+      background:
+        radial-gradient(900px 360px at 10% 0%, rgba(79,70,229,.14), transparent 55%),
+        radial-gradient(800px 420px at 100% 40%, rgba(124,58,237,.10), transparent 60%),
+        rgba(255,255,255,.92);
+    }
+    .wrow{ display:flex; align-items:center; gap:14px; }
+    .temp{ font-size: 44px; font-weight: 980; letter-spacing:-.8px; }
+    .cond{ margin-top:6px; color: var(--muted); font-size: 12px; font-weight: 900; line-height:1.35; max-width: 520px; }
+    .wicon{ font-size: 44px; }
+    .wgrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 10px; color: rgba(15,23,42,.78); font-size: 12px; font-weight: 800; }
+    .mutedBox{ color: var(--muted); font-weight: 800; font-size: 12px; }
+    .locline{
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 900;
+      color: rgba(15,23,42,.70);
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    /* ✅ 推荐活动：更紧凑 */
+    .acts{ display:grid; gap:10px; }
+    .act{
+      display:flex; gap:10px; align-items:flex-start;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.86);
+      cursor:pointer;
+      transition: transform .12s, box-shadow .12s, border-color .12s;
+    }
+    .act:hover{
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+      border-color: rgba(15,23,42,.14);
+      background:#fff;
+    }
+    .act .ic{ font-size: 20px; width: 24px; }
+    .act .t{ font-weight: 980; font-size: 13px; color: rgba(15,23,42,.92); }
+    .act .d{ margin-top: 1px; color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
+    .pill{
+      display:inline-flex; align-items:center;
+      margin-top: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(79,70,229,.18);
+      background: rgba(79,70,229,.10);
+      color: rgba(79,70,229,.92);
+      font-weight: 950;
+      font-size: 11px;
+    }
+
+    /* Toast */
+    .toast{
+      position:fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15,23,42,.92);
+      color: rgba(255,255,255,.96);
+      font-weight: 900;
+      font-size: 12px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.18);
+      z-index: 9999;
+      border: 1px solid rgba(255,255,255,.16);
+      backdrop-filter: blur(10px);
+    }
+
+    /* ===== Modal (edit) ===== */
+    .overlay{
+      position:fixed; inset:0;
+      display:none;
+      background: rgba(15,23,42,.35);
+      z-index: 4000;
+    }
+    .overlay.show{ display:block; }
+    .modal{
+      position:absolute;
+      width: min(560px, calc(100vw - 28px));
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(15,23,42,.10);
+      border-radius: 22px;
+      box-shadow: 0 30px 90px rgba(2,6,23,.18);
+      overflow:hidden;
+      transform: translate(0px,0px);
+      will-change: transform;
+    }
+    .mhead{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(10px);
+      cursor: grab;
+      user-select:none;
+    }
+    .mhead:active{ cursor: grabbing; }
+    .mtitle{
+      font-weight: 980;
+      font-size: 13px;
+      color: rgba(15,23,42,.92);
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .mclose{
+      width: 36px; height: 36px;
+      border-radius: 14px;
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.92);
+      cursor:pointer;
+      display:grid; place-items:center;
+      font-weight: 950;
+      color: rgba(15,23,42,.65);
+      transition: background .12s, transform .12s, border-color .12s;
+    }
+    .mclose:hover{ background:#fff; border-color: rgba(15,23,42,.16); transform: translateY(-1px); }
+    .mclose:active{ transform: translateY(0); }
+    .mbody{ padding: 12px; display:grid; gap:12px; }
+    .lab{
+      font-size: 12px;
+      font-weight: 950;
+      color: rgba(15,23,42,.70);
+      margin-bottom: 8px;
+    }
+    .select, .textarea{
+      width:100%;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.92);
+      padding: 11px 12px;
+      outline:none;
+      font: inherit;
+      font-size: 13px;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .textarea{ min-height: 100px; resize: vertical; }
+    .select:focus, .textarea:focus{
+      border-color: rgba(79,70,229,.40);
+      box-shadow: 0 0 0 4px var(--ring);
+    }
+    .mfoot{
+      padding: 12px;
+      display:flex; justify-content:flex-end; gap:10px;
+      border-top: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(10px);
+    }
+
+    /* ===== Timer overlay (pomodoro) ===== */
+    .toverlay{
+      position:fixed; inset:0;
+      display:none;
+      background: rgba(15,23,42,.35);
+      z-index: 4500;
+    }
+    .toverlay.show{ display:block; }
+    .tmodal{
+      position:absolute;
+      width: min(520px, calc(100vw - 28px));
+      background: rgba(255,255,255,.98);
+      border: 1px solid rgba(15,23,42,.10);
+      border-radius: 22px;
+      box-shadow: 0 30px 90px rgba(2,6,23,.18);
+      overflow:hidden;
+    }
+    .thead{
+      padding: 12px 12px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      border-bottom: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.80);
+    }
+    .thead .title{
+      font-weight: 980;
+      font-size: 13px;
+      color: rgba(15,23,42,.92);
+      line-height: 1.2;
+    }
+    .tclose{
+      width: 36px; height: 36px;
+      border-radius: 14px;
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.92);
+      cursor:pointer;
+      display:grid; place-items:center;
+      font-weight: 950;
+      color: rgba(15,23,42,.65);
+      transition: background .12s, transform .12s, border-color .12s;
+    }
+    .tclose:hover{ background:#fff; border-color: rgba(15,23,42,.16); transform: translateY(-1px); }
+
+    .tbody{ padding: 12px; display:grid; gap:12px; }
+    .quick{ display:flex; gap:10px; flex-wrap:wrap; }
+    .qbtn{
+      border: 1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.92);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor:pointer;
+      font-weight: 950;
+      font-size: 12px;
+      transition: transform .12s, background .12s, border-color .12s, box-shadow .12s;
+      color: rgba(15,23,42,.78);
+    }
+    .qbtn:hover{ transform: translateY(-1px); box-shadow: var(--shadow); border-color: rgba(15,23,42,.14); background:#fff; }
+    .qbtn.sel{
+      border-color: rgba(79,70,229,.18);
+      background: rgba(79,70,229,.10);
+      color: rgba(79,70,229,.92);
+    }
+
+    .trow{ display:flex; gap:10px; align-items:center; }
+    .help{
+      color: rgba(15,23,42,.70);
+      font-size: 12px;
+      font-weight: 850;
+      line-height: 1.4;
+    }
+    .tfoot{
+      padding: 12px;
+      display:flex; justify-content:flex-end; gap:10px;
+      border-top: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.80);
+    }
+
+    /* ===== Activity choose modal ===== */
+    .aoverlay{
+      position:fixed; inset:0;
+      display:none;
+      background: rgba(15,23,42,.35);
+      z-index: 4600;
+    }
+    .aoverlay.show{ display:block; }
+    .amodal{
+      position:absolute;
+      width: min(520px, calc(100vw - 28px));
+      background: rgba(255,255,255,.98);
+      border: 1px solid rgba(15,23,42,.10);
+      border-radius: 22px;
+      box-shadow: 0 30px 90px rgba(2,6,23,.18);
+      overflow:hidden;
+    }
+    .ahead{
+      padding: 12px 12px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      border-bottom: 1px solid rgba(15,23,42,.08);
+      background: rgba(255,255,255,.80);
+    }
+    .ahead .title{
+      font-weight: 980;
+      font-size: 13px;
+      color: rgba(15,23,42,.92);
+      line-height: 1.2;
+    }
+    .abody{ padding: 12px; display:grid; gap:12px; }
+    .achoice{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .achoice .btn{
+      border-radius: 999px;
+      padding: 10px 14px;
+    }
+
+    @media (max-width: 1180px){
+      .app{
+        grid-template-columns: 1fr;
+        height:auto;
+        min-height:100vh;
+        padding: 14px;
+        gap: 14px;
+      }
+      .col{ overflow: visible; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <!-- Sean column -->
+    <aside class="col taskCol" id="colSean">
+      <div class="brand">
+        <div class="logo">S</div>
+        <div>
+          <h1>Sean 今日任务</h1>
+          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出</p>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="row">
+          <input class="input" id="taskInput_sean" placeholder="输入 Sean 今日要完成的任务…" />
+          <button class="btn primary" id="addBtn_sean">添加</button>
+        </div>
+
+        <div class="sectionHead">
+          <div class="sectionTitle">待完成 <span class="count" id="pendingCount_sean">(0)</span></div>
+          <div class="spacer"></div>
+          <button class="mini" id="export_sean" title="导出今日工作表">导出</button>
+        </div>
+        <ul id="pendingList_sean"><li class="empty">暂无待完成任务（可拖动排序）</li></ul>
+
+        <div class="sectionHead" style="margin-top:10px">
+          <div class="sectionTitle">已完成 <span class="count" id="doneCount_sean">(0)</span></div>
+        </div>
+        <ul id="doneList_sean"><li class="empty">暂无已完成任务</li></ul>
+      </div>
+    </aside>
+
+    <!-- Nico column -->
+    <aside class="col taskCol" id="colNico">
+      <div class="brand">
+        <div class="logo">N</div>
+        <div>
+          <h1>Nico 今日任务</h1>
+          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出</p>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="row">
+          <input class="input" id="taskInput_nico" placeholder="输入 Nico 今日要完成的任务…" />
+          <button class="btn primary" id="addBtn_nico">添加</button>
+        </div>
+
+        <div class="sectionHead">
+          <div class="sectionTitle">待完成 <span class="count" id="pendingCount_nico">(0)</span></div>
+          <div class="spacer"></div>
+          <button class="mini" id="export_nico" title="导出今日工作表">导出</button>
+        </div>
+        <ul id="pendingList_nico"><li class="empty">暂无待完成任务（可拖动排序）</li></ul>
+
+        <div class="sectionHead" style="margin-top:10px">
+          <div class="sectionTitle">已完成 <span class="count" id="doneCount_nico">(0)</span></div>
+        </div>
+        <ul id="doneList_nico"><li class="empty">暂无已完成任务</li></ul>
+      </div>
+    </aside>
+
+    <!-- Right: weather + activities -->
+    <main class="col infoCol" id="colInfo">
+      <div class="grid">
+        <section class="card weatherHero">
+          <div class="head" id="weatherHeader">
+            <h2 id="dateTitle">📅 日期</h2>
+            <div class="spacer"></div>
+            <button class="btn ghost icon" id="btnLocate" title="获取定位">📍</button>
+            <button class="btn ghost icon" id="btnUseLast" title="使用上次/默认">↩️</button>
+          </div>
+          <div class="body" id="weatherBox">
+            <div class="mutedBox">加载中...</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="head">
+            <h2>💡 推荐活动</h2>
+          </div>
+          <div class="body">
+            <div class="acts" id="actBox">
+              <div class="mutedBox">加载中...</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="modal" id="modal" role="dialog" aria-modal="true">
+      <div class="mhead" id="dragHandle">
+        <div class="mtitle" id="modalTitle">编辑任务</div>
+        <button class="mclose" id="btnClose" title="关闭">✕</button>
+      </div>
+
+      <div class="mbody">
+        <div>
+          <div class="lab">🏷️ 标注（统一圆点）</div>
+          <select class="select" id="prio">
+            <option value="none">无标注</option>
+            <option value="red">● 重要（红色）</option>
+            <option value="yellow">● 普通（黄色）</option>
+            <option value="green">● 轻松（绿色）</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="lab">📝 备注</div>
+          <textarea class="textarea" id="note" placeholder="写点备注…（截止时间/材料/注意事项）"></textarea>
+        </div>
+      </div>
+
+      <div class="mfoot">
+        <button class="btn" id="btnCancel">取消</button>
+        <button class="btn primary" id="btnSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timer Modal -->
+  <div class="toverlay" id="tOverlay" aria-hidden="true">
+    <div class="tmodal" id="tModal" role="dialog" aria-modal="true">
+      <div class="thead">
+        <div class="title" id="tTitle">⏱ 番茄钟</div>
+        <button class="tclose" id="tClose" title="关闭">✕</button>
+      </div>
+      <div class="tbody" id="tBody">
+        <div class="help" id="tHelp">选择倒计时（最长 60 分钟）。结束后会询问是否完成任务，并记录本次用时到该任务的总时间。</div>
+
+        <div>
+          <div class="lab">快捷时长</div>
+          <div class="quick" id="tQuick">
+            <button class="qbtn" data-min="15">15 分钟</button>
+            <button class="qbtn" data-min="25">25 分钟</button>
+            <button class="qbtn" data-min="45">45 分钟</button>
+            <button class="qbtn" data-min="60">60 分钟</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="lab">自定义（1–60 分钟）</div>
+          <div class="trow">
+            <input class="input" id="tCustomMin" type="number" min="1" max="60" value="25" />
+            <span style="font-weight:950;color:rgba(15,23,42,.70)">分钟</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tfoot">
+        <button class="btn" id="tCancel">取消</button>
+        <button class="btn primary" id="tStart">开始倒计时</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity choose modal -->
+  <div class="aoverlay" id="aOverlay" aria-hidden="true">
+    <div class="amodal" id="aModal" role="dialog" aria-modal="true">
+      <div class="ahead">
+        <div class="title" id="aTitle">添加推荐活动</div>
+        <button class="tclose" id="aClose" title="关闭">✕</button>
+      </div>
+      <div class="abody">
+        <div class="help" id="aHelp">将该推荐活动添加到哪个任务列表？</div>
+        <div class="achoice">
+          <button class="btn primary" id="aToSean">添加到 Sean</button>
+          <button class="btn primary" id="aToNico">添加到 Nico</button>
+          <button class="btn" id="aCancel">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================
+    // 性能优化点（核心）
+    // 1) 计时器 tick 不再每秒重建整列 DOM（原来 renderOwner 每秒 innerHTML 重绘，容易卡）
+    //    -> tick 只更新正在倒计时的文本（.pill2.indigo 的内容）
+    //    -> 只有结构变化（增删改/完成/排序/计时结束）才 renderOwner
+    // 2) localStorage 写入做 debounce（减少频繁 setItem）
+    // ===========================
+
+    // ===== Utils
+    const $ = (s, el=document) => el.querySelector(s);
+    const esc = (s="") => (""+s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    const toast = (msg) => {
+      const t=document.createElement("div");
+      t.className="toast";
+      t.textContent=msg;
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 1600);
+    };
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+    function fmtHHMM(iso){
+      const dt = new Date(iso);
+      const hh = String(dt.getHours()).padStart(2,"0");
+      const mm = String(dt.getMinutes()).padStart(2,"0");
+      return `${hh}:${mm}`;
+    }
+    function fmtMMSS(sec){
+      sec = Math.max(0, Math.floor(sec));
+      const m = String(Math.floor(sec/60)).padStart(2,"0");
+      const s = String(sec%60).padStart(2,"0");
+      return `${m}:${s}`;
+    }
+    function fmtSpent(sec){
+      sec = Math.max(0, Math.floor(sec||0));
+      const h = Math.floor(sec/3600);
+      const m = Math.floor((sec%3600)/60);
+      if(h>0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+    function prioLabel(p){
+      if(p==="red") return "重要";
+      if(p==="yellow") return "普通";
+      if(p==="green") return "轻松";
+      return "无";
+    }
+
+    // ===== Storage keys
+    const LS_SEAN="todoTasks_shadcn_sean_v3_export";
+    const LS_NICO="todoTasks_shadcn_nico_v3_export";
+    const LS_WMODE="weatherMode";
+    const LS_WCOORD="lastCoords";
+
+    // ===== State
+    let tasksByOwner = { sean: [], nico: [] };
+    let edit = { owner: null, id: null };
+    let timerPick = { owner: null, id: null, minutes: 25 };
+
+    let tickHandle = null;
+    let actPick = { title: "" };
+
+    // ===== Debounced save
+    const saveTimers = { sean: null, nico: null };
+    function saveOwner(owner){
+      const key = owner==="sean" ? LS_SEAN : LS_NICO;
+      if(saveTimers[owner]) clearTimeout(saveTimers[owner]);
+      saveTimers[owner] = setTimeout(()=>{
+        try{
+          localStorage.setItem(key, JSON.stringify(tasksByOwner[owner]));
+        }catch(e){
+          // localStorage 可能满了/被禁用，避免卡死
+          console.warn("save failed", e);
+        }
+        saveTimers[owner] = null;
+      }, 120); // 轻微延迟，批量合并写入
+    }
+
+    // ===== Tasks normalize
+    const normalizeTasks = (arr=[]) => arr.map(t => ({
+      id: t.id ?? Date.now(),
+      text: (t.text ?? "").toString(),
+      completed: !!t.completed,
+      note: (t.note ?? "").toString(),
+      prio: (t.prio==="red"||t.prio==="yellow"||t.prio==="green") ? t.prio : "none",
+      order: Number.isFinite(t.order) ? t.order : 0,
+
+      spentSec: Number.isFinite(t.spentSec) ? t.spentSec : 0,
+      timerEnd: Number.isFinite(t.timerEnd) ? t.timerEnd : null,
+      timerDurSec: Number.isFinite(t.timerDurSec) ? t.timerDurSec : null,
+      timerStart: Number.isFinite(t.timerStart) ? t.timerStart : null
+    }));
+
+    function loadOwner(owner){
+      const key = owner==="sean" ? LS_SEAN : LS_NICO;
+      let arr=[];
+      try{ arr = JSON.parse(localStorage.getItem(key)||"[]"); }catch{ arr=[]; }
+      tasksByOwner[owner] = normalizeTasks(arr);
+
+      let p = tasksByOwner[owner].filter(t=>!t.completed).sort((a,b)=>a.order-b.order);
+      let d = tasksByOwner[owner].filter(t=> t.completed).sort((a,b)=>a.order-b.order);
+      p.forEach((t,i)=>t.order=i);
+      d.forEach((t,i)=>t.order=i);
+      tasksByOwner[owner] = [...p, ...d];
+      saveOwner(owner);
+    }
+
+    function tagHTML(p){
+      if(p==="red")    return `<span class="tag red"><span class="dot"></span>重要</span>`;
+      if(p==="yellow") return `<span class="tag yellow"><span class="dot"></span>普通</span>`;
+      if(p==="green")  return `<span class="tag green"><span class="dot"></span>轻松</span>`;
+      return "";
+    }
+    function hlClass(t){
+      if(t.completed) return "";
+      if(t.prio==="red") return "hl-red";
+      if(t.prio==="yellow") return "hl-yellow";
+      if(t.prio==="green") return "hl-green";
+      return "";
+    }
+
+    // ===== Timer helpers
+    function getTask(owner, id){
+      return tasksByOwner[owner]?.find(x=>x.id===id) ?? null;
+    }
+
+    function hasAnyRunningTimer(){
+      const now = Date.now();
+      for(const owner of ["sean","nico"]){
+        for(const t of tasksByOwner[owner]){
+          if(!t.completed && t.timerEnd && now < t.timerEnd) return {owner, id: t.id};
+        }
+      }
+      return null;
+    }
+
+    function clearTimerFields(t){
+      t.timerEnd = null;
+      t.timerDurSec = null;
+      t.timerStart = null;
+    }
+
+    function stopTimerEarly(owner, id){
+      const t = getTask(owner, id); if(!t) return;
+      if(!t.timerStart) return;
+
+      const now = Date.now();
+      const elapsed = Math.max(0, Math.floor((now - t.timerStart) / 1000));
+      t.spentSec = (t.spentSec||0) + elapsed;
+      clearTimerFields(t);
+
+      saveOwner(owner);
+      renderOwner(owner);
+      toast(`⏹ 已停止，已累计 ${fmtSpent(elapsed)}`);
+    }
+
+    function finalizeTimer(owner, id){
+      const t = getTask(owner, id);
+      if(!t) return;
+
+      const end = t.timerEnd ?? Date.now();
+      const start = t.timerStart ?? (end - (t.timerDurSec||0)*1000);
+      const elapsed = Math.max(0, Math.floor((end - start) / 1000));
+      t.spentSec = (t.spentSec||0) + elapsed;
+
+      clearTimerFields(t);
+
+      const ok = confirm(`⏰ 倒计时结束：\n「${t.text}」\n\n本次用时：${fmtSpent(elapsed)}\n累计用时：${fmtSpent(t.spentSec)}\n\n是否已完成该任务？`);
+      if(ok){
+        t.completed = true;
+        const done = tasksByOwner[owner].filter(x=>x.completed && x.id!==t.id);
+        const max = done.length ? Math.max(...done.map(x=>x.order)) : -1;
+        t.order = max + 1;
+      }else{
+        const pending = tasksByOwner[owner].filter(x=>!x.completed && x.id!==t.id);
+        const max = pending.length ? Math.max(...pending.map(x=>x.order)) : -1;
+        t.order = max + 1;
+      }
+
+      const p = tasksByOwner[owner].filter(x=>!x.completed).sort((a,b)=>a.order-b.order);
+      const d = tasksByOwner[owner].filter(x=> x.completed).sort((a,b)=>a.order-b.order);
+      p.forEach((x,i)=>x.order=i);
+      d.forEach((x,i)=>x.order=i);
+      tasksByOwner[owner] = [...p, ...d];
+
+      saveOwner(owner);
+      renderOwner(owner);
+
+      toast(ok ? "✓ 已归类到已完成" : "⏱ 已记录用时，任务仍为未完成");
+    }
+
+    // ✅ 性能优化：tick 只更新倒计时文本，不重绘整列
+    function updateCountdownUI(){
+      const now = Date.now();
+      for(const owner of ["sean","nico"]){
+        for(const t of tasksByOwner[owner]){
+          if(t.completed) continue;
+          if(!t.timerEnd) continue;
+
+          // 到点触发结束（只触发一次）
+          if(now >= t.timerEnd){
+            finalizeTimer(owner, t.id);
+            // finalizeTimer 内部会 renderOwner，DOM结构变化后，下一轮 tick 继续即可
+            continue;
+          }
+
+          // 更新 DOM 上对应任务的倒计时文本
+          const remainSec = Math.ceil((t.timerEnd - now) / 1000);
+          const li = document.querySelector(`.item[data-owner="${owner}"][data-id="${t.id}"]`);
+          if(!li) continue;
+          const pill = li.querySelector(".pill2.indigo");
+          if(pill){
+            // 只更新文字，避免 innerHTML 重建
+            const next = `⏱ ${fmtMMSS(remainSec)}`;
+            if(pill.textContent !== next) pill.textContent = next;
+          }
+        }
+      }
+    }
+
+    function ensureGlobalTick(){
+      if(tickHandle) return;
+      tickHandle = setInterval(()=>{
+        updateCountdownUI();
+        if(!hasAnyRunningTimer()){
+          clearInterval(tickHandle);
+          tickHandle = null;
+        }
+      }, 1000);
+    }
+
+    // ===== Render per owner（仅在结构变化时调用）
+    function renderOwner(owner){
+      const tasks = tasksByOwner[owner];
+
+      const pending = tasks.filter(t=>!t.completed).sort((a,b)=>a.order-b.order);
+      const done = tasks.filter(t=> t.completed).sort((a,b)=>a.order-b.order);
+
+      $(`#pendingCount_${owner}`).textContent = `(${pending.length})`;
+      $(`#doneCount_${owner}`).textContent = `(${done.length})`;
+
+      const renderList = (list, arr, emptyText, draggable=false) => {
+        if(!arr.length){ list.innerHTML = `<li class="empty">${emptyText}</li>`; return; }
+
+        const now = Date.now();
+        list.innerHTML = arr.map(t => {
+          const running = t.timerEnd && now < t.timerEnd;
+          const remainSec = running ? Math.ceil((t.timerEnd - now)/1000) : 0;
+
+          const spent = (t.spentSec||0) > 0 ? `<span class="pill2" title="累计用时">⏳ ${esc(fmtSpent(t.spentSec))}</span>` : ``;
+          const remain = running ? `<span class="pill2 indigo" title="倒计时中">⏱ ${esc(fmtMMSS(remainSec))}</span>` : ``;
+
+          const timerBtn = !t.completed ? `
+            ${running
+              ? `<button class="btn icon" data-act="stopTimer" title="停止计时" style="width:34px;height:34px;padding:0">⏹</button>`
+              : `<button class="btn icon" data-act="timer" title="番茄钟" style="width:34px;height:34px;padding:0">⏱</button>`
+            }
+          ` : ``;
+
+          return `
+            <li class="item ${t.completed?"done":""} ${hlClass(t)}"
+                data-owner="${owner}"
+                data-id="${t.id}"
+                draggable="${draggable ? "true" : "false"}">
+              ${draggable ? `<div class="drag" title="拖动排序" data-act="drag">⋮⋮</div>` : ``}
+              <div class="chk" data-act="toggle" title="完成/取消完成"></div>
+              <div class="text">${esc(t.text)}</div>
+              <div class="meta">
+                ${spent}
+                ${remain}
+                ${t.note ? `<span class="note" title="${esc(t.note)}">🗒️</span>` : ""}
+                ${tagHTML(t.prio)}
+                ${timerBtn}
+                <button class="btn icon" data-act="edit" title="编辑" style="width:34px;height:34px;padding:0">📝</button>
+                <button class="xbtn" data-act="del" title="删除">×</button>
+              </div>
+            </li>
+          `;
+        }).join("");
+      };
+
+      renderList($(`#pendingList_${owner}`), pending, "暂无待完成任务（可拖动排序）", true);
+      renderList($(`#doneList_${owner}`), done, "暂无已完成任务", false);
+    }
+
+    function renderAll(){
+      renderOwner("sean");
+      renderOwner("nico");
+    }
+
+    // ===== Task ops
+    function addTask(owner, textOverride=null){
+      const inp = $(`#taskInput_${owner}`);
+      const text = (textOverride ?? inp.value).trim();
+      if(!text){
+        inp.style.borderColor = "rgba(239,68,68,.55)";
+        setTimeout(()=>inp.style.borderColor="rgba(15,23,42,.10)", 700);
+        return;
+      }
+
+      const tasks = tasksByOwner[owner];
+      const pending = tasks.filter(t=>!t.completed);
+      const maxOrder = pending.length ? Math.max(...pending.map(t=>t.order)) : -1;
+
+      tasks.push({
+        id: Date.now(),
+        text,
+        completed:false,
+        note:"",
+        prio:"none",
+        order: maxOrder + 1,
+        spentSec: 0,
+        timerEnd: null,
+        timerDurSec: null,
+        timerStart: null
+      });
+
+      tasksByOwner[owner] = [
+        ...tasks.filter(t=>!t.completed).sort((a,b)=>a.order-b.order),
+        ...tasks.filter(t=> t.completed).sort((a,b)=>a.order-b.order)
+      ];
+
+      saveOwner(owner);
+      if(!textOverride) inp.value="";
+      renderOwner(owner);
+    }
+
+    function toggleTask(owner, id){
+      const tasks = tasksByOwner[owner];
+      const t = tasks.find(x=>x.id===id); if(!t) return;
+
+      if(!t.completed && t.timerEnd && Date.now() < t.timerEnd){
+        stopTimerEarly(owner, id);
+      }
+
+      t.completed = !t.completed;
+
+      if(t.completed){
+        const done = tasks.filter(x=>x.completed && x.id!==id);
+        const max = done.length ? Math.max(...done.map(x=>x.order)) : -1;
+        t.order = max + 1;
+      }else{
+        const pending = tasks.filter(x=>!x.completed && x.id!==id);
+        const max = pending.length ? Math.max(...pending.map(x=>x.order)) : -1;
+        t.order = max + 1;
+      }
+
+      const p = tasks.filter(x=>!x.completed).sort((a,b)=>a.order-b.order);
+      const d = tasks.filter(x=> x.completed).sort((a,b)=>a.order-b.order);
+      p.forEach((x,i)=>x.order=i);
+      d.forEach((x,i)=>x.order=i);
+      tasksByOwner[owner] = [...p, ...d];
+
+      saveOwner(owner);
+      renderOwner(owner);
+    }
+
+    function deleteTask(owner, id){
+      tasksByOwner[owner] = tasksByOwner[owner].filter(x=>x.id!==id);
+
+      const p = tasksByOwner[owner].filter(x=>!x.completed).sort((a,b)=>a.order-b.order);
+      const d = tasksByOwner[owner].filter(x=> x.completed).sort((a,b)=>a.order-b.order);
+      p.forEach((x,i)=>x.order=i);
+      d.forEach((x,i)=>x.order=i);
+      tasksByOwner[owner] = [...p, ...d];
+
+      saveOwner(owner);
+      renderOwner(owner);
+    }
+
+    // ===== Export (one-click worksheet)
+    async function writeClipboard(text, okMsg){
+      try{
+        await navigator.clipboard.writeText(text);
+        toast(okMsg);
+      }catch{
+        // 兼容一些浏览器权限问题：降级到 prompt
+        try{
+          window.prompt("复制失败，可手动复制：", text);
+        }catch{}
+        toast("复制失败");
+      }
+    }
+
+    function exportWorksheet(owner){
+      const name = owner==="sean" ? "Sean" : "Nico";
+      const tasks = tasksByOwner[owner].slice();
+      const pending = tasks.filter(t=>!t.completed).sort((a,b)=>a.order-b.order);
+      const done = tasks.filter(t=> t.completed).sort((a,b)=>a.order-b.order);
+
+      const lines = [];
+      lines.push(`${name}任务列表`);
+      lines.push("");
+
+      lines.push(`未完成（${pending.length}）:`);
+      if(!pending.length){
+        lines.push("（无）");
+      }else{
+        pending.forEach((t, idx)=>{
+          lines.push(
+            `${idx+1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 备注: ${t.note ? t.note : "无"} | 已工作时间: ${fmtSpent(t.spentSec||0)}`
+          );
+        });
+      }
+
+      lines.push("");
+      lines.push(`已完成（${done.length}）:`);
+      if(!done.length){
+        lines.push("（无）");
+      }else{
+        done.forEach((t, idx)=>{
+          lines.push(
+            `${idx+1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 备注: ${t.note ? t.note : "无"} | 总工作时间: ${fmtSpent(t.spentSec||0)}`
+          );
+        });
+      }
+
+      writeClipboard(lines.join("\n"), `✓ ${name} 工作表已复制`);
+    }
+
+    // ===== Edit Modal
+    const overlay = $("#overlay");
+    const modal = $("#modal");
+
+    function centerModal(el){
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const r = el.getBoundingClientRect();
+      const left = Math.max(14, (vw - r.width)/2);
+      const top  = Math.max(14, (vh - r.height)/2);
+      el.style.left = left + "px";
+      el.style.top = top + "px";
+      el._x = 0; el._y = 0;
+      el.style.transform = "translate(0px,0px)";
+    }
+
+    function openEditModal(owner, id){
+      const t = getTask(owner, id); if(!t) return;
+      edit.owner = owner; edit.id = id;
+      $("#modalTitle").textContent = `编辑：${t.text}`;
+      $("#prio").value = t.prio || "none";
+      $("#note").value = t.note || "";
+
+      overlay.classList.add("show");
+      overlay.setAttribute("aria-hidden","false");
+      centerModal(modal);
+      setTimeout(()=>$("#note").focus(), 0);
+    }
+    function closeEditModal(){
+      edit.owner = null; edit.id = null;
+      overlay.classList.remove("show");
+      overlay.setAttribute("aria-hidden","true");
+    }
+    function saveEditModal(){
+      if(!edit.owner || !edit.id) return;
+      const t = getTask(edit.owner, edit.id); if(!t) return;
+      t.prio = $("#prio").value;
+      t.note = $("#note").value.trim();
+      saveOwner(edit.owner);
+      renderOwner(edit.owner);
+      closeEditModal();
+      toast("✓ 已保存");
+    }
+
+    // draggable edit modal
+    (function makeEditDraggable(){
+      const handle = $("#dragHandle");
+      let dragging=false, sx=0, sy=0, bx=0, by=0;
+      const pt = (e)=> e.touches?.[0] ? {x:e.touches[0].clientX, y:e.touches[0].clientY} : {x:e.clientX, y:e.clientY};
+
+      function down(e){
+        if(e.target && (e.target.id==="btnClose")) return;
+        dragging=true;
+        const p=pt(e); sx=p.x; sy=p.y;
+        bx = modal._x || 0; by = modal._y || 0;
+        e.preventDefault();
+      }
+      function move(e){
+        if(!dragging) return;
+        const p=pt(e);
+        let nx = bx + (p.x - sx);
+        let ny = by + (p.y - sy);
+
+        const rect = modal.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+
+        const minX = - (rect.left - 14);
+        const maxX = (vw - 14) - rect.right;
+        const minY = - (rect.top - 14);
+        const maxY = (vh - 14) - rect.bottom;
+
+        nx = clamp(nx, minX, maxX);
+        ny = clamp(ny, minY, maxY);
+
+        modal._x=nx; modal._y=ny;
+        modal.style.transform = `translate(${nx}px,${ny}px)`;
+      }
+      function up(){ dragging=false; }
+
+      handle.addEventListener("mousedown", down);
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+
+      handle.addEventListener("touchstart", down, {passive:false});
+      window.addEventListener("touchmove", move, {passive:false});
+      window.addEventListener("touchend", up);
+
+      window.addEventListener("resize", ()=>{ if(overlay.classList.contains("show")) centerModal(modal); });
+    })();
+
+    // ===== Timer Modal
+    const tOverlay = $("#tOverlay");
+    const tModal = $("#tModal");
+
+    function openTimerModal(owner, id){
+      const t = getTask(owner, id); if(!t) return;
+      if(t.completed) return;
+
+      const running = hasAnyRunningTimer();
+      if(running && !(running.owner===owner && running.id===id)){
+        const ok = confirm("当前已有一个任务在倒计时中。要停止它并为本任务开始新的番茄钟吗？");
+        if(!ok) return;
+        stopTimerEarly(running.owner, running.id);
+      }
+
+      timerPick.owner = owner;
+      timerPick.id = id;
+      timerPick.minutes = 25;
+
+      $("#tTitle").textContent = `⏱ 番茄钟：${t.text}`;
+      $("#tCustomMin").value = "25";
+
+      $("#tQuick").querySelectorAll(".qbtn").forEach(b=>b.classList.remove("sel"));
+
+      tOverlay.classList.add("show");
+      tOverlay.setAttribute("aria-hidden","false");
+      centerModal(tModal);
+    }
+
+    function closeTimerModal(){
+      tOverlay.classList.remove("show");
+      tOverlay.setAttribute("aria-hidden","true");
+      timerPick.owner = null;
+      timerPick.id = null;
+    }
+
+    function startTimer(minutes){
+      const owner = timerPick.owner;
+      const id = timerPick.id;
+      if(!owner || !id) return;
+
+      minutes = clamp(Number(minutes)||25, 1, 60);
+      const t = getTask(owner, id);
+      if(!t) return;
+
+      if(t.timerEnd && Date.now() < t.timerEnd){
+        toast("⏱ 该任务已在倒计时中");
+        closeTimerModal();
+        ensureGlobalTick();
+        return;
+      }
+
+      const now = Date.now();
+      t.timerStart = now;
+      t.timerDurSec = minutes * 60;
+      t.timerEnd = now + t.timerDurSec * 1000;
+
+      saveOwner(owner);
+      renderOwner(owner);       // 结构变化：显示倒计时 pill + 按钮
+      closeTimerModal();
+      toast(`⏱ 已开始 ${minutes} 分钟`);
+      ensureGlobalTick();
+    }
+
+    // ===== Activity choose modal
+    const aOverlay = $("#aOverlay");
+    const aModal = $("#aModal");
+
+    function openActModal(title){
+      actPick.title = title || "";
+      $("#aTitle").textContent = `添加推荐活动：${actPick.title}`;
+      aOverlay.classList.add("show");
+      aOverlay.setAttribute("aria-hidden","false");
+      centerModal(aModal);
+    }
+    function closeActModal(){
+      actPick.title = "";
+      aOverlay.classList.remove("show");
+      aOverlay.setAttribute("aria-hidden","true");
+    }
+
+    // ===== Drag reorder + autoscroll
+    function enableDnDForOwner(owner){
+      const list = $(`#pendingList_${owner}`);
+      const col = owner==="sean" ? $("#colSean") : $("#colNico");
+      let dragId = null;
+
+      const getItem = (e)=> e.target.closest(".item");
+
+      function autoScroll(e){
+        const r = col.getBoundingClientRect();
+        const y = e.clientY;
+        const edge = 60;
+        const speed = 12;
+        if(y < r.top + edge) col.scrollTop -= speed;
+        else if(y > r.bottom - edge) col.scrollTop += speed;
+      }
+
+      list.addEventListener("dragstart", (e)=>{
+        const item = getItem(e);
+        if(!item) return;
+        dragId = Number(item.dataset.id);
+        item.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try{ e.dataTransfer.setData("text/plain", String(dragId)); }catch{}
+      });
+
+      list.addEventListener("dragend", ()=>{
+        list.querySelectorAll(".item").forEach(x=>x.classList.remove("dragging"));
+        list.querySelectorAll(".dropHint").forEach(x=>x.classList.remove("dropHint"));
+        dragId = null;
+      });
+
+      col.addEventListener("dragover", (e)=>{
+        if(!dragId) return;
+        e.preventDefault();
+        autoScroll(e);
+      });
+
+      list.addEventListener("dragover", (e)=>{
+        e.preventDefault();
+        autoScroll(e);
+        const over = getItem(e);
+        if(!over) return;
+        list.querySelectorAll(".dropHint").forEach(x=>x.classList.remove("dropHint"));
+        over.classList.add("dropHint");
+      });
+
+      list.addEventListener("dragleave", (e)=>{
+        const over = getItem(e);
+        if(over) over.classList.remove("dropHint");
+      });
+
+      list.addEventListener("drop", (e)=>{
+        e.preventDefault();
+        const over = getItem(e);
+        if(!over) return;
+
+        const fromId = dragId ?? Number(e.dataTransfer.getData("text/plain"));
+        const toId = Number(over.dataset.id);
+        if(!fromId || !toId || fromId===toId) return;
+
+        const tasks = tasksByOwner[owner];
+        const pending = tasks.filter(t=>!t.completed).sort((a,b)=>a.order-b.order);
+
+        const fromIdx = pending.findIndex(t=>t.id===fromId);
+        const toIdx   = pending.findIndex(t=>t.id===toId);
+        if(fromIdx<0 || toIdx<0) return;
+
+        const [moved] = pending.splice(fromIdx, 1);
+        pending.splice(toIdx, 0, moved);
+
+        pending.forEach((t,i)=>t.order=i);
+
+        const done = tasks.filter(t=>t.completed).sort((a,b)=>a.order-b.order);
+        tasksByOwner[owner] = [...pending, ...done];
+
+        saveOwner(owner);
+        renderOwner(owner);
+      });
+    }
+
+    // ===== Events (delegation) for both owners
+    function bindOwner(owner){
+      $(`#addBtn_${owner}`).addEventListener("click", ()=>addTask(owner));
+      $(`#taskInput_${owner}`).addEventListener("keydown", e => { if(e.key==="Enter") addTask(owner); });
+
+      $(`#export_${owner}`).addEventListener("click", ()=>exportWorksheet(owner));
+
+      const onListClick = (e) => {
+        const item = e.target.closest(".item");
+        if(!item) return;
+        const id = Number(item.dataset.id);
+        const act = e.target.dataset.act;
+
+        if(act==="toggle"){ e.stopPropagation(); toggleTask(owner, id); return; }
+        if(act==="del"){ e.stopPropagation(); deleteTask(owner, id); return; }
+        if(act==="edit"){ e.stopPropagation(); openEditModal(owner, id); return; }
+        if(act==="timer"){ e.stopPropagation(); openTimerModal(owner, id); return; }
+        if(act==="stopTimer"){ e.stopPropagation(); stopTimerEarly(owner, id); return; }
+
+        openEditModal(owner, id);
+      };
+
+      $(`#pendingList_${owner}`).addEventListener("click", onListClick);
+      $(`#doneList_${owner}`).addEventListener("click", onListClick);
+
+      enableDnDForOwner(owner);
+    }
+
+    // ===== Weather (smart language + date title; remove "更新时间")
+    const getMode = () => localStorage.getItem(LS_WMODE) || "manual";
+    const setMode = (m) => localStorage.setItem(LS_WMODE, m);
+    const getSavedCoords = () => { try{ return JSON.parse(localStorage.getItem(LS_WCOORD)||"null"); }catch{ return null; } };
+    const saveCoords = (lat, lon, name="") => localStorage.setItem(LS_WCOORD, JSON.stringify({lat, lon, name}));
+
+    const windDir = (deg)=>{ const d=["北风","东北风","东风","东南风","南风","西南风","西风","西北风","北风"]; return d[Math.round(deg/45)]; };
+    const wDesc = (c)=>({
+      0:"晴",1:"大致晴",2:"局部多云",3:"阴",45:"有雾",48:"雾凇",
+      51:"毛毛雨",53:"毛毛雨",55:"毛毛雨",
+      61:"小雨",63:"中雨",65:"大雨",
+      71:"小雪",73:"中雪",75:"大雪",
+      80:"阵雨",81:"阵雨",82:"强阵雨",
+      95:"雷暴",96:"雷暴冰雹",99:"强雷暴冰雹"
+    }[c]||"多变天气");
+    const wIcon = (c)=>{
+      if(c===0) return "☀️";
+      if(c===1||c===2) return "⛅";
+      if(c===3) return "☁️";
+      if(c===45||c===48) return "🌫️";
+      if((c>=51&&c<=55)||(c>=61&&c<=65)||(c>=80&&c<=82)) return "🌧️";
+      if(c>=71&&c<=75) return "❄️";
+      if(c===95||c===96||c===99) return "⛈️";
+      return "🌤️";
+    };
+
+    function setDateTitle(){
+      const now = new Date();
+      const week = ["周日","周一","周二","周三","周四","周五","周六"][now.getDay()];
+      const m = now.getMonth()+1;
+      const d = now.getDate();
+      $("#dateTitle").textContent = `📅 ${m}月${d}日 ${week}`;
+    }
+
+    function buildSmartWeatherText(d){
+      const h = d.hourly;
+      if(!h || !h.time || !h.time.length) return "暂无智能预报";
+
+      const now = new Date();
+      const times = h.time.map(t => new Date(t));
+
+      const idx24 = [];
+      for(let i=0;i<times.length;i++){
+        const diffH = (times[i] - now) / 36e5;
+        if(diffH >= 0 && diffH <= 24) idx24.push(i);
+      }
+      if(!idx24.length) return "暂无智能预报";
+
+      const isRain = (i) =>
+        (Number(h.precipitation?.[i] ?? 0) > 0.1) ||
+        (Number(h.precipitation_probability?.[i] ?? 0) >= 50);
+
+      let start = -1;
+      for(const i of idx24){
+        if(isRain(i)){ start = i; break; }
+      }
+
+      if(start === -1){
+        const codes = idx24.map(i => Number(h.weather_code?.[i] ?? 999));
+        const cloudyOrClear = codes.every(c => [0,1,2,3].includes(c));
+        if(cloudyOrClear){
+          const clearish = codes.filter(c => [0,1,2].includes(c)).length / codes.length;
+          return clearish >= 0.7 ? "今天大概率一直晴朗，无明显降雨" : "今天多云为主，无明显降雨";
+        }
+        return "未来24小时降雨可能性较低";
+      }
+
+      const startTime = times[start];
+      const hoursTo = Math.max(0, Math.round((startTime - now) / 36e5));
+      const whenText = hoursTo <= 0
+        ? `可能很快（约 ${fmtHHMM(h.time[start])}）开始下雨`
+        : `预计 ${hoursTo}小时后（约 ${fmtHHMM(h.time[start])}）有雨`;
+
+      let end = start;
+      while(end+1 < times.length && ((times[end+1]-now)/36e5) <= 24 && isRain(end+1)) end++;
+      const durH = end - start + 1;
+
+      const prob = Number(h.precipitation_probability?.[start] ?? 0);
+      const mm = Number(h.precipitation?.[start] ?? 0);
+      const intensity =
+        mm >= 2 ? "雨势可能偏明显" :
+        mm >= 0.5 ? "可能有小到中雨" :
+        "可能是零星小雨";
+
+      const probText = prob ? `（概率约 ${prob}%）` : "";
+
+      if(durH >= 2) return `${whenText}${probText}，可能持续约 ${durH}小时，${intensity}`;
+      return `${whenText}${probText}，持续时间不长，${intensity}`;
+    }
+
+    async function fetchWeather(lat, lon, name){
+      $("#weatherBox").innerHTML = `<div class="mutedBox">加载中...</div>`;
+
+      try{
+        const url = "https://api.open-meteo.com/v1/forecast"
+          + `?latitude=${lat}&longitude=${lon}`
+          + "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code"
+          + "&hourly=precipitation,precipitation_probability,weather_code"
+          + "&timezone=auto";
+
+        const r = await fetch(url, { cache: "no-store" });
+        if(!r.ok) throw new Error("weather");
+        const d = await r.json();
+        const c = d.current;
+
+        const smartText = buildSmartWeatherText(d);
+
+        $("#weatherBox").innerHTML = `
+          <div class="wrow">
+            <div>
+              <div class="temp">${Math.round(c.temperature_2m)}°C</div>
+              <div class="cond">${wDesc(c.weather_code)} · ${smartText}</div>
+              <div class="locline">
+                <span class="pill2 indigo">📍 ${esc(name)}</span>
+              </div>
+            </div>
+            <div class="wicon">${wIcon(c.weather_code)}</div>
+          </div>
+          <div class="wgrid">
+            <div>湿度: ${c.relative_humidity_2m}%</div>
+            <div>风速: ${windDir(c.wind_direction_10m)} ${c.wind_speed_10m} km/h</div>
+          </div>
+        `;
+      }catch{
+        $("#weatherBox").innerHTML = `<div class="mutedBox">无法获取天气数据（检查网络后重试）</div>`;
+      }
+    }
+
+    async function useSavedOrDefault(){
+      const saved = getSavedCoords();
+      if(saved) return fetchWeather(saved.lat, saved.lon, saved.name || "上次位置");
+      return fetchWeather(31.2304, 121.4737, "上海（默认）");
+    }
+
+    async function locateWeather(userClick){
+      $("#weatherBox").innerHTML = `<div class="mutedBox">${userClick ? "请求定位中…" : "加载中…"}</div>`;
+      if(!navigator.geolocation){
+        $("#weatherBox").innerHTML = `<div class="mutedBox">当前浏览器不支持定位</div>`;
+        return;
+      }
+      const pos = await new Promise((res, rej)=>navigator.geolocation.getCurrentPosition(res, rej, {
+        enableHighAccuracy:true, timeout:8000, maximumAge:60_000
+      })).catch(err=>err);
+
+      if(pos && pos.code){
+        if(pos.code===1) setMode("manual");
+        const msg = pos.code===1 ? "定位权限被拒绝（浏览器设置可改为允许）"
+                 : pos.code===2 ? "无法获取位置信息（检查网络/GPS）"
+                 : "定位超时，请重试";
+        $("#weatherBox").innerHTML = `<div class="mutedBox">${msg}</div>`;
+        return;
+      }
+
+      const {latitude:lat, longitude:lon} = pos.coords;
+      setMode("auto");
+
+      let name="当前位置";
+      try{
+        const gr = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=zh&count=1`, { cache: "no-store" });
+        if(gr.ok){
+          const gd = await gr.json();
+          const r = gd?.results?.[0];
+          if(r) name = r.city || r.name || r.admin1 || "当前位置";
+        }
+      }catch{}
+      saveCoords(lat, lon, name);
+      fetchWeather(lat, lon, name);
+    }
+
+    async function initWeather(){
+      const mode = getMode();
+      if(mode==="auto") return locateWeather(false);
+      return useSavedOrDefault();
+    }
+
+    // ===== Activities (open choose modal, not auto add)
+    const activities = [
+      {t:"晨间瑜伽",d:"20分钟舒展，启动身体状态",i:"🧘",tag:"健康"},
+      {t:"阅读时光",d:"安静读一章，积累复利",i:"📚",tag:"学习"},
+      {t:"户外散步",d:"30分钟散步，清理大脑缓存",i:"🚶",tag:"运动"},
+      {t:"整理桌面",d:"10分钟整理，提高效率",i:"🧹",tag:"生活"},
+      {t:"冥想放松",d:"10-15分钟呼吸练习",i:"🫧",tag:"健康"}
+    ];
+    function loadActs(){
+      const pick = activities.slice().sort(()=>Math.random()-0.5).slice(0,3);
+      $("#actBox").innerHTML = pick.map(a=>`
+        <div class="act" data-act="pickAct" data-title="${esc(a.t)}">
+          <div class="ic">${a.i}</div>
+          <div>
+            <div class="t">${esc(a.t)}</div>
+            <div class="d">${esc(a.d)}</div>
+            <span class="pill">${esc(a.tag)}</span>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    $("#actBox").addEventListener("click", (e)=>{
+      const el = e.target.closest('[data-act="pickAct"]');
+      if(!el) return;
+      openActModal(el.dataset.title || "");
+    });
+
+    // ===== Global events
+    $("#btnLocate").addEventListener("click", ()=>locateWeather(true));
+    $("#btnUseLast").addEventListener("click", useSavedOrDefault);
+
+    // edit modal
+    $("#btnClose").addEventListener("click", closeEditModal);
+    $("#btnCancel").addEventListener("click", closeEditModal);
+    $("#btnSave").addEventListener("click", saveEditModal);
+    overlay.addEventListener("click", (e)=>{ if(e.target.id==="overlay") closeEditModal(); });
+
+    // timer modal
+    $("#tClose").addEventListener("click", closeTimerModal);
+    $("#tCancel").addEventListener("click", closeTimerModal);
+    tOverlay.addEventListener("click", (e)=>{ if(e.target.id==="tOverlay") closeTimerModal(); });
+
+    $("#tQuick").addEventListener("click", (e)=>{
+      const b = e.target.closest("[data-min]");
+      if(!b) return;
+      $("#tQuick").querySelectorAll(".qbtn").forEach(x=>x.classList.remove("sel"));
+      b.classList.add("sel");
+      const min = clamp(Number(b.dataset.min)||25, 1, 60);
+      $("#tCustomMin").value = String(min);
+    });
+
+    $("#tStart").addEventListener("click", ()=>{
+      const min = clamp(Number($("#tCustomMin").value)||25, 1, 60);
+      startTimer(min);
+    });
+
+    // activity modal
+    $("#aClose").addEventListener("click", closeActModal);
+    $("#aCancel").addEventListener("click", closeActModal);
+    aOverlay.addEventListener("click", (e)=>{ if(e.target.id==="aOverlay") closeActModal(); });
+
+    $("#aToSean").addEventListener("click", ()=>{
+      if(actPick.title) addTask("sean", actPick.title);
+      closeActModal();
+      toast("✓ 已添加到 Sean");
+    });
+    $("#aToNico").addEventListener("click", ()=>{
+      if(actPick.title) addTask("nico", actPick.title);
+      closeActModal();
+      toast("✓ 已添加到 Nico");
+    });
+
+    document.addEventListener("keydown", (e)=>{
+      if(e.key==="Escape"){
+        if(aOverlay.classList.contains("show")) closeActModal();
+        else if(tOverlay.classList.contains("show")) closeTimerModal();
+        else if(overlay.classList.contains("show")) closeEditModal();
+      }
+    });
+
+    // ===== Init
+    loadOwner("sean");
+    loadOwner("nico");
+    bindOwner("sean");
+    bindOwner("nico");
+    renderAll();
+    setDateTitle();
+    initWeather();
+    loadActs();
+    if(hasAnyRunningTimer()) ensureGlobalTick();
+  </script>
+</body>
+</html>
