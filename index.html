@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>今日任务 · 三列版（Sean / Nico / 天气 + 番茄钟）</title>
+  <title>今日任务 · 三列版（Sean / Nico / 天气 + 番茄钟 + 云同步）</title>
   <style>
     :root{
       --bg1:#f6f7fb;
@@ -117,6 +117,7 @@
       outline:none;
       transition: border-color .15s, box-shadow .15s;
       box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+      min-width: 0;
     }
     .input:focus{
       border-color: rgba(79,70,229,.35);
@@ -200,6 +201,16 @@
     .mini:hover{ background: rgba(15,23,42,.03); border-color: var(--border2); transform: translateY(-1px); }
     .mini:active{ transform: translateY(0); }
 
+    .mini.danger{
+      color: rgba(185, 28, 28, .92);
+      border-color: rgba(239,68,68,.18);
+      background: rgba(239,68,68,.06);
+    }
+    .mini.danger:hover{
+      background: rgba(239,68,68,.10);
+      border-color: rgba(239,68,68,.26);
+    }
+
     ul{ list-style:none; }
     .empty{
       border: 1px dashed rgba(15,23,42,.20);
@@ -255,6 +266,7 @@
       font-size: 14px;
       color: rgba(15,23,42,.92);
       word-break: break-word;
+      min-width: 0;
     }
     .item.done .text{ text-decoration: line-through; color: var(--muted2); }
 
@@ -663,7 +675,7 @@
         <div class="logo">S</div>
         <div>
           <h1>Sean 今日任务</h1>
-          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出</p>
+          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出 · 清除</p>
         </div>
       </div>
 
@@ -677,6 +689,7 @@
           <div class="sectionTitle">待完成 <span class="count" id="pendingCount_sean">(0)</span></div>
           <div class="spacer"></div>
           <button class="mini" id="export_sean" title="导出今日工作表">导出</button>
+          <button class="mini danger" id="clear_sean" title="清除 Sean 全部任务（含未完成与已完成）">清除</button>
         </div>
         <ul id="pendingList_sean"><li class="empty">暂无待完成任务（可拖动排序）</li></ul>
 
@@ -693,7 +706,7 @@
         <div class="logo">N</div>
         <div>
           <h1>Nico 今日任务</h1>
-          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出</p>
+          <p>拖拽排序 · 备注 · 优先级 · 番茄钟 · 导出 · 清除</p>
         </div>
       </div>
 
@@ -707,6 +720,7 @@
           <div class="sectionTitle">待完成 <span class="count" id="pendingCount_nico">(0)</span></div>
           <div class="spacer"></div>
           <button class="mini" id="export_nico" title="导出今日工作表">导出</button>
+          <button class="mini danger" id="clear_nico" title="清除 Nico 全部任务（含未完成与已完成）">清除</button>
         </div>
         <ul id="pendingList_nico"><li class="empty">暂无待完成任务（可拖动排序）</li></ul>
 
@@ -832,13 +846,15 @@
     </div>
   </div>
 
+  <!-- ✅ Supabase SDK（云同步） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     // ===========================
     // 性能优化点（核心）
-    // 1) 计时器 tick 不再每秒重建整列 DOM（原来 renderOwner 每秒 innerHTML 重绘，容易卡）
-    //    -> tick 只更新正在倒计时的文本（.pill2.indigo 的内容）
-    //    -> 只有结构变化（增删改/完成/排序/计时结束）才 renderOwner
-    // 2) localStorage 写入做 debounce（减少频繁 setItem）
+    // 1) tick 每秒只更新倒计时文本，不重绘整列
+    // 2) localStorage 写入 debounce
+    // 3) 云同步：本地变更防抖上传 + 定时拉取
     // ===========================
 
     // ===== Utils
@@ -893,6 +909,18 @@
     let tickHandle = null;
     let actPick = { title: "" };
 
+    // ===== Cloud sync state
+    let localUpdatedAt = 0;
+    let lastRemoteUpdatedAt = 0;
+    let cloudPushTimer = null;
+    let cloudPollTimer = null;
+    let suppressNextPush = false;
+
+    function markStateChanged(){
+      localUpdatedAt = Date.now();
+      scheduleCloudPush();
+    }
+
     // ===== Debounced save
     const saveTimers = { sean: null, nico: null };
     function saveOwner(owner){
@@ -902,11 +930,10 @@
         try{
           localStorage.setItem(key, JSON.stringify(tasksByOwner[owner]));
         }catch(e){
-          // localStorage 可能满了/被禁用，避免卡死
           console.warn("save failed", e);
         }
         saveTimers[owner] = null;
-      }, 120); // 轻微延迟，批量合并写入
+      }, 120);
     }
 
     // ===== Tasks normalize
@@ -984,6 +1011,7 @@
 
       saveOwner(owner);
       renderOwner(owner);
+      markStateChanged();
       toast(`⏹ 已停止，已累计 ${fmtSpent(elapsed)}`);
     }
 
@@ -1018,6 +1046,7 @@
 
       saveOwner(owner);
       renderOwner(owner);
+      markStateChanged();
 
       toast(ok ? "✓ 已归类到已完成" : "⏱ 已记录用时，任务仍为未完成");
     }
@@ -1030,20 +1059,16 @@
           if(t.completed) continue;
           if(!t.timerEnd) continue;
 
-          // 到点触发结束（只触发一次）
           if(now >= t.timerEnd){
             finalizeTimer(owner, t.id);
-            // finalizeTimer 内部会 renderOwner，DOM结构变化后，下一轮 tick 继续即可
             continue;
           }
 
-          // 更新 DOM 上对应任务的倒计时文本
           const remainSec = Math.ceil((t.timerEnd - now) / 1000);
           const li = document.querySelector(`.item[data-owner="${owner}"][data-id="${t.id}"]`);
           if(!li) continue;
           const pill = li.querySelector(".pill2.indigo");
           if(pill){
-            // 只更新文字，避免 innerHTML 重建
             const next = `⏱ ${fmtMMSS(remainSec)}`;
             if(pill.textContent !== next) pill.textContent = next;
           }
@@ -1156,6 +1181,7 @@
       saveOwner(owner);
       if(!textOverride) inp.value="";
       renderOwner(owner);
+      markStateChanged();
     }
 
     function toggleTask(owner, id){
@@ -1186,6 +1212,7 @@
 
       saveOwner(owner);
       renderOwner(owner);
+      markStateChanged();
     }
 
     function deleteTask(owner, id){
@@ -1199,6 +1226,28 @@
 
       saveOwner(owner);
       renderOwner(owner);
+      markStateChanged();
+    }
+
+    function clearAllTasks(owner){
+      const name = owner==="sean" ? "Sean" : "Nico";
+      const ok = confirm(`确定要清除 ${name} 的所有任务吗？\n（包含未完成与已完成，且无法恢复）`);
+      if(!ok) return;
+
+      // 如果该 owner 有正在计时的任务，先停止并累计
+      const now = Date.now();
+      for(const t of tasksByOwner[owner]){
+        if(!t.completed && t.timerEnd && t.timerStart && now < t.timerEnd){
+          const elapsed = Math.max(0, Math.floor((now - t.timerStart) / 1000));
+          t.spentSec = (t.spentSec||0) + elapsed;
+        }
+      }
+
+      tasksByOwner[owner] = [];
+      saveOwner(owner);
+      renderOwner(owner);
+      markStateChanged();
+      toast(`🧹 已清除 ${name} 全部任务`);
     }
 
     // ===== Export (one-click worksheet)
@@ -1207,7 +1256,6 @@
         await navigator.clipboard.writeText(text);
         toast(okMsg);
       }catch{
-        // 兼容一些浏览器权限问题：降级到 prompt
         try{
           window.prompt("复制失败，可手动复制：", text);
         }catch{}
@@ -1291,6 +1339,7 @@
       saveOwner(edit.owner);
       renderOwner(edit.owner);
       closeEditModal();
+      markStateChanged();
       toast("✓ 已保存");
     }
 
@@ -1398,8 +1447,9 @@
       t.timerEnd = now + t.timerDurSec * 1000;
 
       saveOwner(owner);
-      renderOwner(owner);       // 结构变化：显示倒计时 pill + 按钮
+      renderOwner(owner);
       closeTimerModal();
+      markStateChanged();
       toast(`⏱ 已开始 ${minutes} 分钟`);
       ensureGlobalTick();
     }
@@ -1499,6 +1549,7 @@
 
         saveOwner(owner);
         renderOwner(owner);
+        markStateChanged();
       });
     }
 
@@ -1508,6 +1559,7 @@
       $(`#taskInput_${owner}`).addEventListener("keydown", e => { if(e.key==="Enter") addTask(owner); });
 
       $(`#export_${owner}`).addEventListener("click", ()=>exportWorksheet(owner));
+      $(`#clear_${owner}`).addEventListener("click", ()=>clearAllTasks(owner));
 
       const onListClick = (e) => {
         const item = e.target.closest(".item");
@@ -1530,14 +1582,14 @@
       enableDnDForOwner(owner);
     }
 
-    // ===== Weather (smart language + date title; remove "更新时间")
+    // ===== Weather
     const getMode = () => localStorage.getItem(LS_WMODE) || "manual";
     const setMode = (m) => localStorage.setItem(LS_WMODE, m);
     const getSavedCoords = () => { try{ return JSON.parse(localStorage.getItem(LS_WCOORD)||"null"); }catch{ return null; } };
     const saveCoords = (lat, lon, name="") => localStorage.setItem(LS_WCOORD, JSON.stringify({lat, lon, name}));
 
     const windDir = (deg)=>{ const d=["北风","东北风","东风","东南风","南风","西南风","西风","西北风","北风"]; return d[Math.round(deg/45)]; };
-    const wDesc = (c)=>({
+    const wDesc = (c)=>( {
       0:"晴",1:"大致晴",2:"局部多云",3:"阴",45:"有雾",48:"雾凇",
       51:"毛毛雨",53:"毛毛雨",55:"毛毛雨",
       61:"小雨",63:"中雨",65:"大雨",
@@ -1786,6 +1838,93 @@
       }
     });
 
+    // =====================
+    // Public Cloud Sync (No Login) - Supabase 公共同步
+    // =====================
+    // 1) 填入你的 Supabase 项目地址 & Publishable key
+    // 2) PUBLIC_ROOM_ID 建议改成“只有你知道的房间码”，避免被别人覆盖
+    const SUPABASE_URL = "https://gcscoppqwllhpdcithib.supabase.co";    // TODO: 替换
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2NvcHBxd2xsaHBkY2l0aGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzAwMTAsImV4cCI6MjA4NzgwNjAxMH0.a6a11ZD7-iLWAYJMDcI8C7y-CmxUmwNepdILhTJi_T8";    // TODO: 替换
+    const PUBLIC_ROOM_ID = "global";                                // 可改成私密房间码，例如 "putao-2026-sean-nico"
+
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function buildLocalState(){
+      return {
+        tasksByOwner,
+        updatedAt: localUpdatedAt || Date.now()
+      };
+    }
+
+    async function cloudPushNow(){
+      if(suppressNextPush){
+        suppressNextPush = false;
+        return;
+      }
+      const payload = buildLocalState();
+      try{
+        const { error } = await supa
+          .from("public_state")
+          .upsert({ id: PUBLIC_ROOM_ID, state: payload, updated_at: new Date().toISOString() });
+        if(error) throw error;
+        // 以本地为准，更新“远端已同步时间”
+        lastRemoteUpdatedAt = Math.max(lastRemoteUpdatedAt, payload.updatedAt);
+      }catch(e){
+        console.warn("cloud push failed", e);
+      }
+    }
+
+    function scheduleCloudPush(){
+      // 本地变化防抖上传，避免频繁写库
+      if(cloudPushTimer) clearTimeout(cloudPushTimer);
+      cloudPushTimer = setTimeout(cloudPushNow, 700);
+    }
+
+    async function cloudPullOnce(){
+      try{
+        const { data, error } = await supa
+          .from("public_state")
+          .select("state")
+          .eq("id", PUBLIC_ROOM_ID)
+          .single();
+        if(error) throw error;
+
+        const remote = data?.state;
+        if(!remote || !remote.tasksByOwner) return;
+
+        const remoteAt = Number(remote.updatedAt || 0);
+        if(!remoteAt) return;
+
+        // 远端不比本地新：忽略
+        if(remoteAt <= Math.max(lastRemoteUpdatedAt, localUpdatedAt)) return;
+
+        // 应用远端
+        suppressNextPush = true; // 防止“刚拉下来又立刻 push 回去”
+        lastRemoteUpdatedAt = remoteAt;
+        localUpdatedAt = remoteAt;
+
+        // 覆盖内存态
+        tasksByOwner = remote.tasksByOwner;
+
+        // 同步到 localStorage（保证刷新也一致）
+        try{ localStorage.setItem(LS_SEAN, JSON.stringify(tasksByOwner.sean || [])); }catch{}
+        try{ localStorage.setItem(LS_NICO, JSON.stringify(tasksByOwner.nico || [])); }catch{}
+
+        renderAll();
+
+        // 如果有倒计时任务，继续 tick
+        if(hasAnyRunningTimer()) ensureGlobalTick();
+      }catch(e){
+        console.warn("cloud pull failed", e);
+      }
+    }
+
+    function startCloudSync(){
+      if(cloudPollTimer) return;
+      cloudPullOnce(); // 打开先拉一次
+      cloudPollTimer = setInterval(cloudPullOnce, 3000); // 每 3 秒拉取
+    }
+
     // ===== Init
     loadOwner("sean");
     loadOwner("nico");
@@ -1795,6 +1934,14 @@
     setDateTitle();
     initWeather();
     loadActs();
+
+    // 初始化 localUpdatedAt（避免 0）
+    localUpdatedAt = Date.now();
+    // 启动同步（会先 pull 一次）
+    startCloudSync();
+    // 若本地已经有数据，也可以推一把（防止云端为空时覆盖）
+    scheduleCloudPush();
+
     if(hasAnyRunningTimer()) ensureGlobalTick();
   </script>
 </body>
