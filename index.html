@@ -2123,8 +2123,6 @@
         try{ localStorage.setItem(LS_NICO, JSON.stringify(tasksByOwner.nico || [])); }catch{}
 
         renderAll();
-        // ✅ 只补记，不弹窗（避免轮询频繁弹）
-        reconcileExpiredTimers();
         if(hasAnyRunningTimer()) ensureGlobalTick();
       }catch(e){
         console.warn("cloud pull failed", e);
