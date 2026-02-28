@@ -1308,39 +1308,54 @@
       }
     }
 
-    function exportWorksheet(owner){
-      const name = owner==="sean" ? "Sean" : "Nico";
+    function exportWorksheet(owner) {
+      const name = owner === "sean" ? "Sean" : "Nico";
       const tasks = tasksByOwner[owner].slice();
-      const pending = tasks.filter(t=>!t.completed).sort((a,b)=>a.order-b.order);
-      const done = tasks.filter(t=> t.completed).sort((a,b)=>a.order-b.order);
+      const pending = tasks.filter(t => !t.completed).sort((a, b) => a.order - b.order);
+      const done = tasks.filter(t => t.completed).sort((a, b) => a.order - b.order);
 
       const lines = [];
       lines.push(`${name}任务列表`);
-      lines.push("");
+      lines.push("");  // 添加空行
 
+      // 未完成的任务
       lines.push(`未完成（${pending.length}）:`);
-      if(!pending.length){
+      if (!pending.length) {
         lines.push("（无）");
-      }else{
-        pending.forEach((t, idx)=>{
+      } else {
+        pending.forEach((t, idx) => {
+          // 任务基础信息在同一行
           lines.push(
-            `${idx+1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 备注: ${t.note ? t.note : "无"} | 已工作时间: ${fmtSpent(t.spentSec||0)}`
+            `${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`
           );
+          // 如果有备注，另起一行并进行缩进
+          if (t.note) {
+            const notes = t.note.split("\n").map(note => `    ${esc(note)}`).join("\n");
+            lines.push(notes);
+          }
         });
       }
 
-      lines.push("");
+      lines.push("");  // 添加空行
+      // 已完成的任务
       lines.push(`已完成（${done.length}）:`);
-      if(!done.length){
+      if (!done.length) {
         lines.push("（无）");
-      }else{
-        done.forEach((t, idx)=>{
+      } else {
+        done.forEach((t, idx) => {
+          // 任务基础信息在同一行
           lines.push(
-            `${idx+1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 备注: ${t.note ? t.note : "无"} | 总工作时间: ${fmtSpent(t.spentSec||0)}`
+            `${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`
           );
+          // 如果有备注，另起一行并进行缩进
+          if (t.note) {
+            const notes = t.note.split("\n").map(note => `    ${esc(note)}`).join("\n");
+            lines.push(notes);
+          }
         });
       }
 
+      // 将生成的文本复制到剪贴板
       writeClipboard(lines.join("\n"), `✓ ${name} 工作表已复制`);
     }
 
