@@ -231,6 +231,8 @@
       box-shadow: 0 1px 0 rgba(255,255,255,.92) inset;
       transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
       cursor:pointer;
+      flex-wrap: wrap;
+      align-items: center;
     }
     .item + .item{ margin-top: 8px; }
     .item:hover{
@@ -262,43 +264,22 @@
     .item.done .chk::after{ opacity: 1; transform: scale(1); }
 
     .text{
-      flex:1;
+      flex: 1 1 220px;
+      min-width: 180px;
       font-size: 14px;
       color: rgba(15,23,42,.92);
       word-break: break-word;
-      min-width: 0;
     }
     .item.done .text{ text-decoration: line-through; color: var(--muted2); }
 
-    .meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-    
-    /* ===== 修复：重要性标签导致文字被挤压竖排 ===== */
-    /* 允许任务整体内部换行 */
-    .item{
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    /* 给文字一个最小宽度，避免被挤成一字一行 */
-    .text{
-      flex: 1 1 220px;   /* 可改成 200px 或 240px 看效果 */
-      min-width: 180px;
-    }
-
-    /* 右侧按钮区域挤不下时自动换行 */
     .meta{
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;
       margin-left: auto;
       flex: 0 1 auto;
       max-width: 100%;
     }
-
-    /* 手机优化（强烈推荐保留） */
     @media (max-width: 520px){
-      .meta{
-        flex-basis: 100%;
-        justify-content: flex-end;
-        margin-top: 8px;
-      }
+      .meta{ flex-basis: 100%; justify-content: flex-end; margin-top: 8px; }
     }
 
     .note{ opacity:.85; font-size: 14px; }
@@ -319,16 +300,16 @@
       width:10px;height:10px;border-radius:999px; flex:0 0 10px;
       box-shadow: 0 0 0 2px rgba(255,255,255,.85) inset;
     }
-    .tag.red{ background: var(--redBg); border-color: var(--redBd); color: #b91c1c; }
-    .tag.yellow{ background: var(--yelBg); border-color: var(--yelBd); color: #92400e; }
-    .tag.green{ background: var(--grnBg); border-color: var(--grnBd); color: #166534; }
-    .tag.red .dot{ background: var(--red); }
-    .tag.yellow .dot{ background: var(--yellow); }
-    .tag.green .dot{ background: var(--green); }
+    .tag.red{ background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.22); color: #b91c1c; }
+    .tag.yellow{ background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.25); color: #92400e; }
+    .tag.green{ background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.22); color: #166534; }
+    .tag.red .dot{ background: #ef4444; }
+    .tag.yellow .dot{ background: #f59e0b; }
+    .tag.green .dot{ background: #22c55e; }
 
-    .hl-red{ border-color: var(--redBd); background: linear-gradient(0deg, var(--redBg), var(--redBg)), rgba(255,255,255,.92); }
-    .hl-yellow{ border-color: var(--yelBd); background: linear-gradient(0deg, var(--yelBg), var(--yelBg)), rgba(255,255,255,.92); }
-    .hl-green{ border-color: var(--grnBd); background: linear-gradient(0deg, var(--grnBg), var(--grnBg)), rgba(255,255,255,.92); }
+    .hl-red{ border-color: rgba(239,68,68,.22); background: linear-gradient(0deg, rgba(239,68,68,.10), rgba(239,68,68,.10)), rgba(255,255,255,.92); }
+    .hl-yellow{ border-color: rgba(245,158,11,.25); background: linear-gradient(0deg, rgba(245,158,11,.12), rgba(245,158,11,.12)), rgba(255,255,255,.92); }
+    .hl-green{ border-color: rgba(34,197,94,.22); background: linear-gradient(0deg, rgba(34,197,94,.10), rgba(34,197,94,.10)), rgba(255,255,255,.92); }
     .item.done.hl-red, .item.done.hl-yellow, .item.done.hl-green{
       background: rgba(34,197,94,.08);
       border-color: rgba(34,197,94,.18);
@@ -337,7 +318,7 @@
     .xbtn{
       width:34px;height:34px;
       border-radius: 14px;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(15,23,42,.10);
       background: rgba(255,255,255,.90);
       cursor:pointer;
       display:grid; place-items:center;
@@ -382,9 +363,9 @@
       white-space:nowrap;
     }
     .pill2.indigo{
-      border-color: var(--indigoBd);
-      background: var(--indigoBg);
-      color: var(--indigoTx);
+      border-color: rgba(79,70,229,.18);
+      background: rgba(79,70,229,.10);
+      color: rgba(79,70,229,.92);
     }
 
     /* ===== Right cards ===== */
@@ -399,7 +380,7 @@
       background: rgba(255,255,255,.92);
       border: 1px solid rgba(15,23,42,.10);
       border-radius: 22px;
-      box-shadow: var(--shadow);
+      box-shadow: 0 10px 30px rgba(2,6,23,.08);
       overflow:hidden;
     }
     .card .head{
@@ -417,21 +398,10 @@
     }
     .card .body{ padding: 14px; }
 
-
-    /* 角部圆形样式 */
-    .card, .weatherHero {
-        border-radius: 20px; /* 设置圆角大小 */
-        background: #f6f7fb; /* 统一背景颜色 */
-    }
-
-    /* 如果要单独修改卡片上某一部分 */
-    .card .head {
-        border-radius: 20px 20px 0 0; /* 仅上边角圆角 */
-    }
-
-    .weatherHero .head {
-        border-radius: 20px 20px 0 0;
-    }
+    /* 圆角与背景 */
+    .card, .weatherHero { border-radius: 20px; background: #f6f7fb; }
+    .card .head { border-radius: 20px 20px 0 0; }
+    .weatherHero .head { border-radius: 20px 20px 0 0; }
 
     .weatherHero{
       background:
@@ -441,10 +411,10 @@
     }
     .wrow{ display:flex; align-items:center; gap:14px; }
     .temp{ font-size: 44px; font-weight: 980; letter-spacing:-.8px; }
-    .cond{ margin-top:6px; color: var(--muted); font-size: 12px; font-weight: 900; line-height:1.35; max-width: 520px; }
+    .cond{ margin-top:6px; color: #64748b; font-size: 12px; font-weight: 900; line-height:1.35; max-width: 520px; }
     .wicon{ font-size: 44px; }
     .wgrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 10px; color: rgba(15,23,42,.78); font-size: 12px; font-weight: 800; }
-    .mutedBox{ color: var(--muted); font-weight: 800; font-size: 12px; }
+    .mutedBox{ color: #64748b; font-weight: 800; font-size: 12px; }
     .locline{
       margin-top: 8px;
       font-size: 12px;
@@ -456,7 +426,6 @@
       flex-wrap:wrap;
     }
 
-    /* ✅ 推荐活动：更紧凑 */
     .acts{ display:grid; gap:10px; }
     .act{
       display:flex; gap:10px; align-items:flex-start;
@@ -469,13 +438,13 @@
     }
     .act:hover{
       transform: translateY(-1px);
-      box-shadow: var(--shadow);
+      box-shadow: 0 10px 30px rgba(2,6,23,.08);
       border-color: rgba(15,23,42,.14);
       background:#fff;
     }
     .act .ic{ font-size: 20px; width: 24px; }
     .act .t{ font-weight: 980; font-size: 13px; color: rgba(15,23,42,.92); }
-    .act .d{ margin-top: 1px; color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
+    .act .d{ margin-top: 1px; color: #64748b; font-size: 12px; line-height: 1.35; font-weight: 700; }
     .pill{
       display:inline-flex; align-items:center;
       margin-top: 6px;
@@ -565,7 +534,7 @@
     .select, .textarea{
       width:100%;
       border-radius: 16px;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(15,23,42,.10);
       background: rgba(255,255,255,.92);
       padding: 11px 12px;
       outline:none;
@@ -576,7 +545,7 @@
     .textarea{ min-height: 100px; resize: vertical; }
     .select:focus, .textarea:focus{
       border-color: rgba(79,70,229,.40);
-      box-shadow: 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, .25);
     }
     .mfoot{
       padding: 12px;
@@ -641,7 +610,7 @@
       transition: transform .12s, background .12s, border-color .12s, box-shadow .12s;
       color: rgba(15,23,42,.78);
     }
-    .qbtn:hover{ transform: translateY(-1px); box-shadow: var(--shadow); border-color: rgba(15,23,42,.14); background:#fff; }
+    .qbtn:hover{ transform: translateY(-1px); box-shadow: 0 10px 30px rgba(2,6,23,.08); border-color: rgba(15,23,42,.14); background:#fff; }
     .qbtn.sel{
       border-color: rgba(79,70,229,.18);
       background: rgba(79,70,229,.10);
@@ -846,7 +815,11 @@
         <button class="tclose" id="tClose" title="关闭">✕</button>
       </div>
       <div class="tbody" id="tBody">
-        <div class="help" id="tHelp">选择倒计时（最长 60 分钟）。结束后会询问是否完成任务，并记录本次用时到该任务的总时间。</div>
+        <div class="help" id="tHelp">
+          选择倒计时（最长 60 分钟）。<br/>
+          ✅ 若计时结束时你仍在页面，将询问是否完成任务。<br/>
+          ✅ 若计时结束时你不在页面，将自动累计用时，不弹窗。
+        </div>
 
         <div>
           <div class="lab">快捷时长</div>
@@ -897,10 +870,12 @@
 
   <script>
     // ===========================
-    // 云同步修复版：
-    // ✅ 删除 suppressNextPush（避免“第一次修改不推送”）
-    // ✅ push 前先读远端 rev：远端更大则先 pull，避免覆盖
-    // ✅ pull 后 normalizeTasks
+    // 番茄钟行为（按你的需求）：
+    // 1) Sean/Nico 可并行计时：每个 owner 同时最多 1 个任务计时，互不冲突
+    // 2) 计时结束：
+    //    - 若当时页面可见（在页面停留）：弹窗询问是否完成任务
+    //    - 若当时页面不可见（退出/切后台/不在页面）：自动累计用时，不弹窗
+    // 3) 修复：不在页面时结束，回来后也会自动补累计（仍不弹窗）
     // ===========================
 
     // ===== Utils
@@ -962,8 +937,6 @@
     // ===== Cloud sync state
     let localUpdatedAt = 0;
     let lastRemoteUpdatedAt = 0;
-
-    // ✅ 用版本号做同步判断
     let localRev = 0;
     let lastRemoteRev = 0;
 
@@ -971,14 +944,10 @@
     let cloudPollTimer = null;
 
     function markStateChanged(){
-      // ✅ 用 rev 递增（不依赖设备时间）
       localRev = (Number(localRev) || 0) + 1;
       try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
-
-      // updatedAt 仅用于展示/日志
       localUpdatedAt = Date.now();
       try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
-
       scheduleCloudPush();
     }
 
@@ -988,11 +957,7 @@
       const key = owner==="sean" ? LS_SEAN : LS_NICO;
       if(saveTimers[owner]) clearTimeout(saveTimers[owner]);
       saveTimers[owner] = setTimeout(()=>{
-        try{
-          localStorage.setItem(key, JSON.stringify(tasksByOwner[owner]));
-        }catch(e){
-          console.warn("save failed", e);
-        }
+        try{ localStorage.setItem(key, JSON.stringify(tasksByOwner[owner])); }catch(e){ console.warn("save failed", e); }
         saveTimers[owner] = null;
       }, 120);
     }
@@ -1045,6 +1010,16 @@
       return tasksByOwner[owner]?.find(x=>x.id===id) ?? null;
     }
 
+    // ✅ 每个 owner 只允许一个任务计时（Sean 和 Nico 可并行）
+    function hasRunningTimer(owner){
+      const now = Date.now();
+      for(const t of tasksByOwner[owner] || []){
+        if(!t.completed && t.timerEnd && now < t.timerEnd) return {owner, id: t.id};
+      }
+      return null;
+    }
+
+    // ✅ 全局：用于 tick 是否继续跑（任意一个在跑都继续）
     function hasAnyRunningTimer(){
       const now = Date.now();
       for(const owner of ["sean","nico"]){
@@ -1076,24 +1051,61 @@
       toast(`⏹ 已停止，已累计 ${fmtSpent(elapsed)}`);
     }
 
-    function finalizeTimer(owner, id){
+    // 统一计算：按“整轮”或按“实际到点/当前”结算
+    function calcElapsedForSettle(t, settleToMs){
+      const endMs = Number(t.timerEnd || 0);
+      const durSec = Number(t.timerDurSec || 0);
+      if(!endMs || !durSec) return 0;
+
+      const startMs = Number(t.timerStart || (endMs - durSec * 1000));
+      const toMs = Math.max(startMs, Number(settleToMs || endMs));
+      return Math.max(0, Math.floor((toMs - startMs) / 1000));
+    }
+
+    // ✅ 不弹窗的自动结算：用于“页面不在/回来补结算”
+    function settleTimerSilent(owner, id, {showToast=false} = {}){
       const t = getTask(owner, id);
       if(!t) return;
+      if(!t.timerEnd || !t.timerDurSec) { clearTimerFields(t); return; }
 
-      const end = t.timerEnd ?? Date.now();
-      const start = t.timerStart ?? (end - (t.timerDurSec||0)*1000);
-      const elapsed = Math.max(0, Math.floor((end - start) / 1000));
-      t.spentSec = (t.spentSec||0) + elapsed;
+      // 自动结算：如果已经到点，按整轮结算
+      const elapsedSec = calcElapsedForSettle(t, t.timerEnd);
+
+      t.spentSec = (t.spentSec||0) + elapsedSec;
+      clearTimerFields(t);
+
+      saveOwner(owner);
+      renderOwner(owner);
+      markStateChanged();
+
+      if(showToast) toast(`⏰ 已结束：累计 ${fmtSpent(elapsedSec)}`);
+    }
+
+    // ✅ 在页面停留时结束：弹窗询问是否完成任务（并已累计用时）
+    function finalizeTimerWithPrompt(owner, id){
+      const t = getTask(owner, id);
+      if(!t) return;
+      if(!t.timerEnd || !t.timerDurSec) { clearTimerFields(t); return; }
+
+      // 计时结束：按整轮结算
+      const elapsedSec = calcElapsedForSettle(t, t.timerEnd);
+      t.spentSec = (t.spentSec||0) + elapsedSec;
 
       clearTimerFields(t);
 
-      const ok = confirm(`⏰ 倒计时结束：\n「${t.text}」\n\n本次用时：${fmtSpent(elapsed)}\n累计用时：${fmtSpent(t.spentSec)}\n\n是否已完成该任务？`);
+      const ok = confirm(
+        `⏰ 倒计时结束：\n「${t.text}」\n\n本次用时：${fmtSpent(elapsedSec)}\n累计用时：${fmtSpent(t.spentSec)}\n\n是否已完成该任务？`
+      );
+
+      // 保持你原本的“归类 + 重新排序”逻辑
       if(ok){
         t.completed = true;
         const done = tasksByOwner[owner].filter(x=>x.completed && x.id!==t.id);
         const max = done.length ? Math.max(...done.map(x=>x.order)) : -1;
         t.order = max + 1;
       }else{
+        // 仍未完成：放到待完成末尾（跟你原逻辑一致）
+        t.completed = false;
         const pending = tasksByOwner[owner].filter(x=>!x.completed && x.id!==t.id);
         const max = pending.length ? Math.max(...pending.map(x=>x.order)) : -1;
         t.order = max + 1;
@@ -1112,7 +1124,23 @@
       toast(ok ? "✓ 已归类到已完成" : "⏱ 已记录用时，任务仍为未完成");
     }
 
-    // ✅ 性能优化：tick 只更新倒计时文本，不重绘整列
+    // ✅ 关键修复：补结算扫描（回来后只自动累计，不弹窗）
+    function reconcileExpiredTimers(){
+      const now = Date.now();
+      const expired = [];
+      for(const owner of ["sean","nico"]){
+        for(const t of tasksByOwner[owner] || []){
+          if(t.completed) continue;
+          if(!t.timerEnd) continue;
+          if(now >= t.timerEnd) expired.push({owner, id: t.id});
+        }
+      }
+      // 回来补账：永远 silent，不弹窗
+      for(const x of expired) settleTimerSilent(x.owner, x.id, {showToast:false});
+      if(hasAnyRunningTimer()) ensureGlobalTick();
+    }
+
+    // ✅ tick：只更新倒计时文本，不重绘整列
     function updateCountdownUI(){
       const now = Date.now();
       for(const owner of ["sean","nico"]){
@@ -1121,7 +1149,12 @@
           if(!t.timerEnd) continue;
 
           if(now >= t.timerEnd){
-            finalizeTimer(owner, t.id);
+            // 到点：在页面 => 弹窗；不在页面 => 静默累计
+            if(document.hidden){
+              settleTimerSilent(owner, t.id, {showToast:false});
+            }else{
+              finalizeTimerWithPrompt(owner, t.id);
+            }
             continue;
           }
 
@@ -1148,7 +1181,7 @@
       }, 1000);
     }
 
-    // ===== Render per owner（仅在结构变化时调用）
+    // ===== Render per owner
     function renderOwner(owner){
       const tasks = tasksByOwner[owner];
 
@@ -1295,7 +1328,6 @@
       const ok = confirm(`确定要清除 ${name} 的所有任务吗？\n（包含未完成与已完成，且无法恢复）`);
       if(!ok) return;
 
-      // 如果该 owner 有正在计时的任务，先停止并累计
       const now = Date.now();
       for(const t of tasksByOwner[owner]){
         if(!t.completed && t.timerEnd && t.timerStart && now < t.timerEnd){
@@ -1311,15 +1343,13 @@
       toast(`🧹 已清除 ${name} 全部任务`);
     }
 
-    // ===== Export (one-click worksheet)
+    // ===== Export
     async function writeClipboard(text, okMsg){
       try{
         await navigator.clipboard.writeText(text);
         toast(okMsg);
       }catch{
-        try{
-          window.prompt("复制失败，可手动复制：", text);
-        }catch{}
+        try{ window.prompt("复制失败，可手动复制：", text); }catch{}
         toast("复制失败");
       }
     }
@@ -1332,19 +1362,14 @@
 
       const lines = [];
       lines.push(`${name}任务列表`);
-      lines.push("");  // 添加空行
+      lines.push("");
 
-      // 未完成的任务
       lines.push(`未完成（${pending.length}）:`);
       if (!pending.length) {
         lines.push("（无）");
       } else {
         pending.forEach((t, idx) => {
-          // 任务基础信息在同一行
-          lines.push(
-            `${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`
-          );
-          // 如果有备注，另起一行并进行缩进
+          lines.push(`${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`);
           if (t.note) {
             const notes = t.note.split("\n").map(note => `    ${esc(note)}`).join("\n");
             lines.push(notes);
@@ -1352,18 +1377,13 @@
         });
       }
 
-      lines.push("");  // 添加空行
-      // 已完成的任务
+      lines.push("");
       lines.push(`已完成（${done.length}）:`);
       if (!done.length) {
         lines.push("（无）");
       } else {
         done.forEach((t, idx) => {
-          // 任务基础信息在同一行
-          lines.push(
-            `${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`
-          );
-          // 如果有备注，另起一行并进行缩进
+          lines.push(`${idx + 1}. ${t.text} | 重要性: ${prioLabel(t.prio)} | 总工作时间: ${fmtSpent(t.spentSec || 0)}`);
           if (t.note) {
             const notes = t.note.split("\n").map(note => `    ${esc(note)}`).join("\n");
             lines.push(notes);
@@ -1371,7 +1391,6 @@
         });
       }
 
-      // 将生成的文本复制到剪贴板
       writeClipboard(lines.join("\n"), `✓ ${name} 工作表已复制`);
     }
 
@@ -1473,9 +1492,10 @@
       const t = getTask(owner, id); if(!t) return;
       if(t.completed) return;
 
-      const running = hasAnyRunningTimer();
+      // ✅ 只检查“同 owner 是否已有计时”，不再全局互斥
+      const running = hasRunningTimer(owner);
       if(running && !(running.owner===owner && running.id===id)){
-        const ok = confirm("当前已有一个任务在倒计时中。要停止它并为本任务开始新的番茄钟吗？");
+        const ok = confirm(`当前 ${owner==="sean"?"Sean":"Nico"} 已有一个任务在倒计时中。\n要停止它并为本任务开始新的番茄钟吗？`);
         if(!ok) return;
         stopTimerEarly(running.owner, running.id);
       }
@@ -1486,7 +1506,6 @@
 
       $("#tTitle").textContent = `⏱ 番茄钟：${t.text}`;
       $("#tCustomMin").value = "25";
-
       $("#tQuick").querySelectorAll(".qbtn").forEach(b=>b.classList.remove("sel"));
 
       tOverlay.classList.add("show");
@@ -1629,7 +1648,7 @@
       });
     }
 
-    // ===== Events (delegation) for both owners
+    // ===== Events for owner
     function bindOwner(owner){
       $(`#addBtn_${owner}`).addEventListener("click", ()=>addTask(owner));
       $(`#taskInput_${owner}`).addEventListener("keydown", e => { if(e.key==="Enter") addTask(owner); });
@@ -1750,7 +1769,6 @@
 
     async function fetchWeather(lat, lon, name){
       $("#weatherBox").innerHTML = `<div class="mutedBox">加载中...</div>`;
-
       try{
         const url = "https://api.open-meteo.com/v1/forecast"
           + `?latitude=${lat}&longitude=${lon}`
@@ -1833,7 +1851,7 @@
       return useSavedOrDefault();
     }
 
-    // ===== Activities (open choose modal, not auto add)
+    // ===== Activities
     const activities = [
       {t:"晨间瑜伽",d:"20分钟舒展，启动身体状态",i:"🧘",tag:"健康"},
       {t:"阅读时光",d:"安静读一章，积累复利",i:"📚",tag:"学习"},
@@ -1854,7 +1872,6 @@
         </div>
       `).join("");
     }
-
     $("#actBox").addEventListener("click", (e)=>{
       const el = e.target.closest('[data-act="pickAct"]');
       if(!el) return;
@@ -1914,6 +1931,12 @@
       }
     });
 
+    // ✅ 回到页面时：只做“补累计”（不弹窗）
+    document.addEventListener("visibilitychange", ()=>{
+      if(!document.hidden) reconcileExpiredTimers();
+    });
+    window.addEventListener("focus", ()=>reconcileExpiredTimers());
+
     // =====================
     // Public Cloud Sync (No Login) - Supabase 公共同步
     // =====================
@@ -1931,25 +1954,18 @@
       };
     }
 
-    // ✅ 修复：push 前先读远端 rev，避免低 rev 覆盖高 rev
     async function cloudPushNow(){
       const payload = buildLocalState();
       try{
-        // 先读远端
         const { data: rdata, error: rerr } = await supa
           .from("public_state")
           .select("state")
           .eq("id", PUBLIC_ROOM_ID)
           .single();
 
-        if(rerr && rerr.code !== "PGRST116"){ // PGRST116: no rows (可能不存在)
-          // 其它错误才抛
-          throw rerr;
-        }
+        if(rerr && rerr.code !== "PGRST116"){ throw rerr; }
 
         const remoteRev = Number(rdata?.state?.rev || 0);
-
-        // 远端更大 => 先 pull（避免覆盖）
         if(remoteRev > (payload.rev || 0)){
           await cloudPullOnce();
           return;
@@ -1988,14 +2004,12 @@
         const remoteRev = Number(remote.rev || 0);
         if(!remoteRev) return;
 
-        // ✅ 用 rev 判断新旧
         if(remoteRev <= Math.max(lastRemoteRev, localRev)) return;
 
         lastRemoteRev = remoteRev;
         localRev = remoteRev;
         try{ localStorage.setItem(LS_REV, String(localRev)); }catch{}
 
-        // updatedAt 只做显示/日志
         const remoteAt = Number(remote.updatedAt || 0);
         if(remoteAt){
           lastRemoteUpdatedAt = remoteAt;
@@ -2003,7 +2017,6 @@
           try{ localStorage.setItem(LS_UPDATED_AT, String(localUpdatedAt)); }catch{}
         }
 
-        // ✅ pull 后 normalize，避免空白/字段异常
         tasksByOwner = {
           sean: normalizeTasks(remote.tasksByOwner?.sean || []),
           nico: normalizeTasks(remote.tasksByOwner?.nico || [])
@@ -2013,6 +2026,10 @@
         try{ localStorage.setItem(LS_NICO, JSON.stringify(tasksByOwner.nico || [])); }catch{}
 
         renderAll();
+
+        // ✅ pull 后也补累计一次（仍不弹窗）
+        reconcileExpiredTimers();
+
         if(hasAnyRunningTimer()) ensureGlobalTick();
       }catch(e){
         console.warn("cloud pull failed", e);
@@ -2035,14 +2052,11 @@
     initWeather();
     loadActs();
 
-    // ✅ 初始化同步元信息（重要）
     localUpdatedAt = Number(localStorage.getItem(LS_UPDATED_AT) || 0) || Date.now();
     localRev = Number(localStorage.getItem(LS_REV) || 0) || 0;
 
-    // 启动同步（会先 pull 一次）
     startCloudSync();
 
-    // 首次打开：如果本地有任务且 rev=0，就把 rev 置 1 并 push 一次，避免被空云端覆盖
     if(localRev === 0){
       const hasLocalData = (tasksByOwner.sean?.length || 0) + (tasksByOwner.nico?.length || 0) > 0;
       if(hasLocalData){
@@ -2051,9 +2065,11 @@
         scheduleCloudPush();
       }
     }else{
-      // 正常情况：也推一把（cloudPushNow 内部会先对比远端 rev，不会覆盖更高 rev）
       scheduleCloudPush();
     }
+
+    // ✅ 首屏补累计（仍不弹窗）
+    reconcileExpiredTimers();
 
     if(hasAnyRunningTimer()) ensureGlobalTick();
   </script>
